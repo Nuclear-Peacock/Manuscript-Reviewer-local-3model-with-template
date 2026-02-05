@@ -32,7 +32,7 @@ It produces:
 - No manuscript text is sent to remote LLMs.
 - Novelty/reference search uses **keywords + DOIs/PMIDs + paraphrased novelty claims only** (no manuscript excerpts).
 - Outputs go to `outputs/` (gitignored).
-- Put real manuscripts in `private_inputs/` (gitignored).
+- Put real manuscripts in private_inputs/ (ignored by git). Do not upload unpublished manuscripts to GitHub.
 
 This repo includes a **synthetic demo manuscript** only—safe to share.
 
