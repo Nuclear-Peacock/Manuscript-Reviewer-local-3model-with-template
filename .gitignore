@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+outputs/
+cache/
+
+# --- SAFE PUBLIC DEMO EXCEPTIONS (synthetic only) ---
+!demo/
+!demo/**
+!demo/**/*.pdf
+!demo/**/*.png
+!demo/**/*.jpg
+!demo/**/*.jpeg
+!demo/**/*.webp
+!demo/**/*.svg
+
+# Real manuscripts should go here (never commit)
+private_inputs/
