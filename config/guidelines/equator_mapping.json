@@ -1,0 +1,84 @@
+{
+  "diagnostic_accuracy": {
+    "primary": "STARD 2015",
+    "extensions": [
+      "STARD-AI (if AI)"
+    ],
+    "notes": [
+      "reference standard, blinding",
+      "flow/exclusions",
+      "reader study design"
+    ]
+  },
+  "prediction_model": {
+    "primary": "TRIPOD",
+    "extensions": [
+      "TRIPOD+AI (if AI)",
+      "TRIPOD-Cluster (if clustered)"
+    ],
+    "notes": [
+      "calibration, validation, CIs",
+      "unit of analysis/clustering"
+    ]
+  },
+  "rct": {
+    "primary": "CONSORT",
+    "extensions": [
+      "CONSORT-AI (if AI)",
+      "SPIRIT (protocol)",
+      "SPIRIT-AI (protocol, if AI)"
+    ],
+    "notes": [
+      "randomization, allocation concealment",
+      "outcomes, harms"
+    ]
+  },
+  "observational": {
+    "primary": "STROBE",
+    "extensions": [
+      "TRIPOD/TRIPOD+AI (if prediction)"
+    ],
+    "notes": [
+      "selection bias, confounding",
+      "missing data"
+    ]
+  },
+  "systematic_review": {
+    "primary": "PRISMA 2020",
+    "extensions": [
+      "PRISMA-P (protocol)",
+      "PRISMA-LSR (living SR)"
+    ],
+    "notes": [
+      "search strategy, selection",
+      "risk of bias, synthesis"
+    ]
+  },
+  "quality_improvement": {
+    "primary": "SQUIRE",
+    "extensions": [],
+    "notes": [
+      "context, intervention, measures",
+      "sustainability"
+    ]
+  },
+  "qualitative": {
+    "primary": "SRQR/COREQ",
+    "extensions": [],
+    "notes": [
+      "sampling, reflexivity",
+      "analysis approach"
+    ]
+  },
+  "education": {
+    "primary": "Design-appropriate (CONSORT/STROBE/SRQR etc.)",
+    "extensions": [
+      "Education rigor overlay"
+    ],
+    "notes": [
+      "learner level/context",
+      "validity evidence",
+      "outcomes framework"
+    ]
+  }
+}

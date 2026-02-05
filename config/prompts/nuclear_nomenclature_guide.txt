@@ -1,0 +1,77 @@
+Radiopharmaceutical nomenclature style guide
+1) Preferred terminology (use these words)
+1.1 Radiopharmaceutical, radioligand
+Radiopharmaceutical: the preferred umbrella term for radioactive pharmaceutical substances administered for imaging or therapy (e.g., [18F]FDG, [68Ga]Ga-PSMA-11, [177Lu]Lu-PSMA-617).
+Radioligand: acceptable when specifically describing a ligand–target (e.g., receptor/antigen-binding) agent; if used, it must still follow all radionuclide naming rules below.
+1.2 Replace “radiotracer” and “tracer”
+Replace radiotracer with radiopharmaceutical (preferred) or radioligand (when ligand–target context is central).
+Do not use tracer alone (ambiguous). If you mean the administered agent, write radiopharmaceutical (or radioligand).
+1.3 Radioactivity vs activity (measurements)
+Radioactivity is the spontaneous decay (nuclear transformation) of unstable nuclei with emission of ionizing radiation (particles and/or photons); it is a phenomenon/property, not the quantitative measurement.
+Use activity for the quantity you measure, and report it in Bq (with pre-SI units such as mCi/Ci only in parentheses if included).
+1.4 Avoid jargon
+Do not use hot/cold for radioactive/nonradioactive; write radioactive and nonradioactive.
+2) How to write radionuclides and radiopharmaceutical names
+2.1 When the radionuclide is part of a named compound (square brackets)
+In a radiopharmaceutical name, place the radionuclide descriptor in square brackets immediately before the compound name or chemical formula:
+[AE]Compound (A is the mass number and E is the elemental symbol)
+No hyphen between the bracketed radionuclide and the compound name.
+Examples:
+[18F]FDG
+[223Ra]RaCl2
+[99mTc]NaTcO4
+Do not write: 18F-FDG, F-18 FDG, [18F]-FDG.
+2.2 Radiometal-containing radiopharmaceuticals (chelator/complex-based)
+When the radionuclide is a metal, the metal element symbol must appear in the compound name (because the chelator/ligand itself does not contain the metal):
+Correct: [68Ga]Ga-PSMA-11, [64Cu]Cu-DOTA-TATE, [177Lu]Lu-DOTA-TATE, [99mTc]Tc-DTPA
+Incorrect: [68Ga]PSMA-11, [64Cu]DOTA-TATE, [99mTc]DTPA, 99mTc-DTPA
+2.3 When the radionuclide is mentioned alone in running text (spell out)
+If the radionuclide is mentioned in isolation (not as part of a compound name), spell it out as element–mass number:
+fluorine-18, carbon-11, gallium-68, technetium-99m
+Example:
+“The radioisotope present in [18F]FDG is fluorine-18.”
+Don’t use shorthand forms in prose (e.g., 18F, F-18, Tc-99m, 99mTc) when the radioisotope is being referenced as the subject.
+2.4 Typesetting
+Mass numbers should be superscripted in typeset text (e.g., ¹⁸F, ⁶⁸Ga, ⁹⁹ᵐTc).
+2.5 Abbreviations in radiopharmaceutical names (do not spell out)
+In the radiopharmaceutical name itself, retain widely accepted abbreviations/acronyms for common compounds, targets, and building blocks.
+Use: [18F]FDG, [68Ga]Ga-PSMA-11, [177Lu]Lu-PSMA-617
+Do not write the full chemical/biologic expansion in the name (e.g., avoid [18F]fluorodeoxyglucose or [68Ga]Ga–prostate-specific membrane antigen… as a name).
+If needed for reader clarity, spell out an abbreviation once in running text at first mention, then continue using the abbreviation.
+Preserve standard capitalization (e.g., FDG, PSMA, DOTA where applicable).
+3) Hyphens and what not to bracket
+3.1 Use hyphens for processes/descriptors (no brackets)
+Rule: Reserve square brackets for radiopharmaceutical names/formulae. Do not use square brackets when describing a process, descriptor, or attribute.
+Correct:
+18F-fluorination
+11C-labeling
+68Ga-labeled (as an adjective)
+“fluorine-18 labeling” (prose alternative)
+Incorrect:
+[18F]fluorination
+[11C]labeling
+[68Ga]labeled
+3.2 Use hyphens to join metal + ligand name when the ligand does not otherwise contain the metal
+For radiometal-containing agents, connect the metal element symbol to the remainder of the name with a hyphen.
+Examples: [68Ga]Ga-PSMA-11, [177Lu]Lu-PSMA-617, [99mTc]Tc-DTPA, [64Cu]Cu-DOTA-TATE
+Reminder: Do not omit the metal element symbol (e.g., avoid [68Ga]PSMA-11).
+4) Quick reference (Do/Don’t)
+Do
+[18F]FDG
+[68Ga]Ga-PSMA-11
+[177Lu]Lu-PSMA-617
+fluorine-18 (radionuclide alone)
+18F-fluorination / fluorine-18 labeling (process)
+Use radiopharmaceutical (preferred) or radioligand (when appropriate)
+Don’t
+18F-FDG, F-18 FDG, [18F]-FDG
+[68Ga]PSMA-11 (missing metal symbol)
+[18F]fluorination / [11C]labeling (brackets used for a process)
+radiotracer (replace with radiopharmaceutical/radioligand)
+tracer (do not use alone)
+hot/cold (use radioactive/nonradioactive)
+Use the following hierarchy when consulting reference materials:
+Chemical nomenclature for radiopharmaceuticals
+AJR style guide
+Consensus nomenclature rules for radiopharmaceutical chemistry: setting the record straight
+European Association of Nuclear Medicine practical short guidance

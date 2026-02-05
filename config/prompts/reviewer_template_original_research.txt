@@ -1,0 +1,57 @@
+Questions to guide the reviewer regarding decisions on ORIGINAL RESEARCH MANUSCRIPTS
+Does the manuscript provide new information that is not already available in published form?
+If yes, please provide a description of what you believe is new.
+If no, then unless the manuscript has something else extremely important to offer, the manuscript likely should be rejected.
+Do the authors provide a sound rationale for performing this study?
+If no, then the manuscript likely should be rejected.
+Has the data been properly analyzed?
+If no, then the manuscript likely should be rejected or major revisions should be requested.
+Have the results been clearly presented?
+If no, then a major revision should likely be requested.
+Please list major comments that need to be addressed in a revision (i.e., the manuscript cannot be accepted unless these comments are adequately addressed)
+1.
+2.
+3.
+4.
+Please list other comments that you request to be addressed in a revision
+5.
+6.
+7.
+8.
+Other items to be considered when composing your review (please structure your review using the headings listed below)
+The Abstract
+Does the Abstract appropriately summarize the manuscript?
+Do any discrepancies exist between the Abstract and the remainder of the manuscript?
+Can the abstract be understood without reading the manuscript?
+The Introduction
+Is the Introduction concise?
+Is the purpose of the study clearly defined?
+Do the authors provide a rationale for performing the study based on a review of the medical literature?
+Do the authors define terms used in the remainder of the manuscript?
+Is there is a well-defined hypothesis?
+Methods
+Could another investigator reproduce the study using the Methods as outlined?
+Do the authors justify any choices available to them in their study design (e.g., choices of imaging techniques, analytic tools, or statistical methods)?
+Have the authors designed methods that could reasonably allow their hypothesis to be tested
+Results
+Are the Results are clearly explained?
+Does the order of presentation of the Results parallels the order of presentation of the Methods?
+Are the Results reasonable and expected?
+Are any Results introduced that are not preceded by an appropriate discussion in the Methods?
+Discussion
+Is the Discussion concise?
+Do the authors state whether the hypothesis was verified or falsified?
+Are the author’s conclusions justified by the results found in the study?
+Do the authors adequately account for unexpected results?
+Do the authors note limitations of the study?
+Figures and Graphs
+Are the figures and graphs correct and are they appropriately labeled?
+Do the figures and graphs adequately show the important results?
+Do arrows need to be added to depict important or subtle findings?
+Do the figure legends provide a clear explanation that allows the figures and graphs to be understood without making reference to the remainder of the manuscript?
+Tables
+Do the tables appropriately describe the Results?
+References
+Does the reference list follow the format for the journal?
+Does the reference list contain errors?
+Do any important references need to be added?

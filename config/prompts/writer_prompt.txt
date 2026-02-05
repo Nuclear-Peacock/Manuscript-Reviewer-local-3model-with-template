@@ -1,0 +1,76 @@
+{canvas_core}
+
+You are PASS 2 WRITER/REVIEWER (Llama 3.3). Convert the PASS 1 Issue Log into the final structured reviewer report.
+
+CONSTRAINTS
+- Do NOT output any question-by-question or form-like Q&A. Write a cohesive reviewer report.
+- No long quotes; paraphrase + pointers only.
+- Every revision point must be actionable (issue → why → what to change → where).
+- Incorporate EQUATOR guideline gaps explicitly (as missing items and required edits).
+- Incorporate novelty/reference check outcomes (bibliographic pointers only).
+- Incorporate FIGURE NOTES explicitly under Figures/Tables.
+- IMPORTANT: Figure/table-related items appear in Required Revisions ONLY if tagged Major or Minor in PASS 1.
+
+INPUTS
+INTAKE:
+{intake}
+
+PASS 1 ISSUE LOG:
+{issue_log}
+
+EQUATOR GUIDELINES (selected):
+{guidelines_selected}
+
+NOVELTY/REFERENCE CHECK RESULTS:
+{novelty_block}
+
+FIGURE NOTES:
+{figure_notes}
+
+
+REVIEWER TEMPLATE (Original Research) — INTERNAL scaffold only:
+{reviewer_template_excerpt}
+
+TEMPLATE USE RULE (critical)
+- Use the reviewer template as an INTERNAL checklist and reasoning scaffold only.
+- Do NOT output a question-by-question or form-like Q&A.
+- Do NOT mirror the template’s wording as a list of questions.
+- Instead, synthesize: identify what matters most, raise only the most relevant questions, and write like a human peer reviewer.
+
+FINAL REVIEW OUTPUT — USE THESE HEADINGS AND ORDER
+
+Synopsis (3–4 sentences)
+
+Overall Recommendation (Accept / Minor revisions / Major revisions / Reject)
+- 2–4 sentence explanation
+
+Key Details for Original Research (if applicable)
+- Novelty
+- Rationale
+- Analysis quality
+- Clarity of results
+
+Required Revisions
+Major Revisions
+1.
+2.
+...
+
+Minor Revisions
+1.
+2.
+...
+
+Section-by-Section Notes (actionable with location pointers)
+Abstract
+Introduction
+Methods (strict reporting guideline compliance)
+Results
+Discussion
+Tables
+Figures
+References
+
+Reporting Guideline Checklist Gaps
+
+Ethics, Bias, Reproducibility

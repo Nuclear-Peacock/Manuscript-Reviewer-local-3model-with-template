@@ -1,0 +1,78 @@
+{
+  "name": "core_rubric",
+  "items": [
+    {
+      "id": "novelty",
+      "label": "Novelty claim and prior work positioning",
+      "probes": [
+        "novel",
+        "first",
+        "gap in literature",
+        "objective of this study"
+      ],
+      "severity": "major"
+    },
+    {
+      "id": "methods_design",
+      "label": "Study design clarity (population, inclusion/exclusion, reference standard)",
+      "probes": [
+        "inclusion criteria",
+        "exclusion criteria",
+        "reference standard",
+        "prospective",
+        "retrospective"
+      ],
+      "severity": "major"
+    },
+    {
+      "id": "stats",
+      "label": "Statistical analysis and uncertainty reporting",
+      "probes": [
+        "confidence interval",
+        "multivariable",
+        "power",
+        "sample size",
+        "p value",
+        "calibration"
+      ],
+      "severity": "major"
+    },
+    {
+      "id": "ai_leakage",
+      "label": "AI: split design and leakage prevention",
+      "probes": [
+        "train",
+        "validation",
+        "test",
+        "patient-level",
+        "data leakage",
+        "external validation"
+      ],
+      "severity": "major"
+    },
+    {
+      "id": "nuc_protocol",
+      "label": "Nuclear medicine protocol details",
+      "probes": [
+        "radiopharmaceutical",
+        "administered activity",
+        "uptake time",
+        "acquisition",
+        "reconstruction",
+        "dosimetry"
+      ],
+      "severity": "major"
+    },
+    {
+      "id": "ethics",
+      "label": "Ethics/IRB/consent/privacy",
+      "probes": [
+        "IRB",
+        "ethics approval",
+        "consent waiver",
+        "HIPAA"
+      ],
+      "severity": "major"
+    }
+  ]
+}
