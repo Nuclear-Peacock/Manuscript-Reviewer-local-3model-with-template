@@ -2,11 +2,12 @@ name: "Security Shield"
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main"]   # Runs every time you commit to main
   pull_request:
-    branches: ["main"]
+    branches: ["main"]   # Runs every time you open a PR
   schedule:
-    - cron: '0 0 * * 1' # Runs every Monday at midnight
+    - cron: '0 0 * * 1'  # Runs automatically every Monday at midnight (even if you don't code)
+  workflow_dispatch:      # Adds a manual "Play" button just in case
 
 jobs:
   scan:
