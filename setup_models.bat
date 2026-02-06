@@ -5,21 +5,22 @@ cd /d "%~dp0"
 REM ==========================================================
 REM setup_models.bat
 REM - Installs missing Ollama models
-REM - Then launches run_ui.bat automatically
+REM - Auto-launches run_ui.bat ONLY in interactive mode
+REM - If called with args (recommended/best/fast/all/list), it does NOT launch UI
 REM ==========================================================
 
-REM If called with an argument, install that set without prompting:
+REM Argument modes (non-interactive; NO auto-launch):
 REM   setup_models.bat recommended
 REM   setup_models.bat best
 REM   setup_models.bat fast
 REM   setup_models.bat all
 REM   setup_models.bat list
 
-if /I "%~1"=="recommended" goto RECOMMENDED
-if /I "%~1"=="best" goto BEST
-if /I "%~1"=="fast" goto FAST
-if /I "%~1"=="all" goto ALL
-if /I "%~1"=="list" goto LIST
+if /I "%~1"=="recommended" goto RECOMMENDED_ARG
+if /I "%~1"=="best" goto BEST_ARG
+if /I "%~1"=="fast" goto FAST_ARG
+if /I "%~1"=="all" goto ALL_ARG
+if /I "%~1"=="list" goto LIST_ARG
 
 goto MENU
 
@@ -57,11 +58,11 @@ if errorlevel 1 (
 
 set /p CHOICE=Select an option (1-6): 
 
-if "%CHOICE%"=="1" goto RECOMMENDED
-if "%CHOICE%"=="2" goto BEST
-if "%CHOICE%"=="3" goto FAST
-if "%CHOICE%"=="4" goto ALL
-if "%CHOICE%"=="5" goto LIST
+if "%CHOICE%"=="1" goto RECOMMENDED_UI
+if "%CHOICE%"=="2" goto BEST_UI
+if "%CHOICE%"=="3" goto FAST_UI
+if "%CHOICE%"=="4" goto ALL_UI
+if "%CHOICE%"=="5" goto LIST_UI
 if "%CHOICE%"=="6" goto END
 
 echo.
@@ -70,24 +71,34 @@ pause
 goto MENU
 
 
-:RECOMMENDED
+REM =========================
+REM UI (interactive) routes
+REM =========================
+:RECOMMENDED_UI
 set MODELS=deepseek-r1:32b llama3.3:70b qwen2.5vl:7b
-goto INSTALL
+call :INSTALL_MODELS
+if errorlevel 1 goto FAIL_UI
+goto LAUNCH_UI
 
-:BEST
+:BEST_UI
 set MODELS=deepseek-r1:70b llama3.3:70b qwen2.5vl:7b
-goto INSTALL
+call :INSTALL_MODELS
+if errorlevel 1 goto FAIL_UI
+goto LAUNCH_UI
 
-:FAST
+:FAST_UI
 set MODELS=deepseek-r1:14b llama3.1:8b qwen2.5vl:7b
-goto INSTALL
+call :INSTALL_MODELS
+if errorlevel 1 goto FAIL_UI
+goto LAUNCH_UI
 
-:ALL
+:ALL_UI
 set MODELS=deepseek-r1:70b deepseek-r1:32b deepseek-r1:14b llama3.3:70b llama3.1:8b qwen2.5vl:7b
-goto INSTALL
+call :INSTALL_MODELS
+if errorlevel 1 goto FAIL_UI
+goto LAUNCH_UI
 
-
-:LIST
+:LIST_UI
 call :CHECK_OLLAMA
 if errorlevel 1 (
   pause
@@ -102,12 +113,43 @@ pause
 goto LAUNCH_UI
 
 
-:INSTALL
+REM =========================
+REM ARG (non-interactive) routes
+REM (install and EXIT; no launch)
+REM =========================
+:RECOMMENDED_ARG
+set MODELS=deepseek-r1:32b llama3.3:70b qwen2.5vl:7b
+call :INSTALL_MODELS
+exit /b %errorlevel%
+
+:BEST_ARG
+set MODELS=deepseek-r1:70b llama3.3:70b qwen2.5vl:7b
+call :INSTALL_MODELS
+exit /b %errorlevel%
+
+:FAST_ARG
+set MODELS=deepseek-r1:14b llama3.1:8b qwen2.5vl:7b
+call :INSTALL_MODELS
+exit /b %errorlevel%
+
+:ALL_ARG
+set MODELS=deepseek-r1:70b deepseek-r1:32b deepseek-r1:14b llama3.3:70b llama3.1:8b qwen2.5vl:7b
+call :INSTALL_MODELS
+exit /b %errorlevel%
+
+:LIST_ARG
 call :CHECK_OLLAMA
-if errorlevel 1 (
-  pause
-  exit /b 1
-)
+if errorlevel 1 exit /b 1
+ollama list
+exit /b 0
+
+
+REM =========================
+REM Helpers
+REM =========================
+:INSTALL_MODELS
+call :CHECK_OLLAMA
+if errorlevel 1 exit /b 1
 
 echo.
 echo Installing models (only missing ones will download):
@@ -115,18 +157,13 @@ echo.
 
 for %%M in (%MODELS%) do (
   call :ENSURE_MODEL "%%M"
-  if errorlevel 1 (
-    echo.
-    echo Setup failed. Fix the error above and re-run setup_models.bat.
-    pause
-    exit /b 1
-  )
+  if errorlevel 1 exit /b 1
 )
 
 echo.
 echo DONE. Model setup complete.
 echo.
-goto LAUNCH_UI
+exit /b 0
 
 
 :ENSURE_MODEL
@@ -150,7 +187,7 @@ curl -s http://localhost:11434/api/tags >nul 2>&1
 if errorlevel 1 (
   echo.
   echo ERROR: Ollama is not reachable at http://localhost:11434
-  echo Start Ollama, then run setup_models.bat again.
+  echo Start Ollama, then re-run.
   echo.
   exit /b 1
 )
@@ -167,13 +204,19 @@ if not exist "run_ui.bat" (
   exit /b 1
 )
 
-REM Use CALL so this window continues into run_ui.bat
 call "run_ui.bat"
 
 echo.
 echo App exited (or you closed it). Press any key to close this window.
 pause
 exit /b 0
+
+
+:FAIL_UI
+echo.
+echo Setup failed. Fix the error above and re-run setup_models.bat.
+pause
+goto MENU
 
 
 :END
