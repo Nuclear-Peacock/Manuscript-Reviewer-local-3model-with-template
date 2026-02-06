@@ -173,6 +173,7 @@ def build_cli_command(
     manuscript_category: str,
     study_design: Optional[str],
     has_ai: bool,
+    review_images: bool,  # <--- New Argument
     critic_model: str,
     writer_model: str,
     vision_model: str,
@@ -186,7 +187,6 @@ def build_cli_command(
     }
     cat_value = category_map.get(manuscript_category, "other")
 
-    # ADDED "-u" HERE ---------------------------------- vvv
     cmd = [
         sys.executable, "-u", "-m", "reviewer.cli",
         "--input", str(pdf_path),
@@ -194,11 +194,15 @@ def build_cli_command(
         "--manuscript_type", cat_value,
         "--critic_model", critic_model,
         "--writer_model", writer_model,
-        "--vlm_model", vision_model,
-        "--fig_dpi", str(int(image_clarity)),
-        "--temperature", str(float(deliberate_random)),
+        # We only add vlm_model if the user wants images
+        # If we skip this, the CLI will see it as None
     ]
-    # ------------------------------------------------------
+    
+    if review_images:
+        cmd += ["--vlm_model", vision_model]
+        cmd += ["--fig_dpi", str(int(image_clarity))]
+        
+    cmd += ["--temperature", str(float(deliberate_random))]
 
     if manuscript_category == "Original Research" and study_design and study_design != "Not specified":
         cmd += ["--study_design", study_design]
@@ -262,8 +266,10 @@ def main():
                     pull_model_with_progress(m)
 
         st.markdown("### Advanced settings")
+        
+        # NOTE: Slider is only relevant if images are on, but we leave it for simplicity
         image_clarity = st.slider(
-            "Image clarity (higher = sharper, slower)",
+            "Image clarity (if analyzing images)",
             min_value=120, max_value=320, value=int(preset["image_clarity"]), step=10,
         )
 
@@ -302,7 +308,18 @@ def main():
             study_design = st.selectbox("Study design (optional)", STUDY_DESIGNS, index=0)
             
         st.markdown("---")
-        has_ai = st.checkbox("Includes AI/ML components?", value=False, help="Check if the manuscript uses AI/ML. Triggers specific checklists.")
+        # --- NEW TOGGLES ---
+        has_ai = st.checkbox("Includes AI/ML components?", value=False, help="Triggers CLAIM checklist validation.")
+        
+        review_images = st.checkbox(
+            "Analyze Figures & Tables? (Slow)", 
+            value=True, 
+            help="Uncheck this to skip the Vision AI step. This makes the review MUCH faster."
+        )
+        if review_images:
+            st.caption("⚠️ Adds 1-5 mins processing time.")
+        else:
+            st.caption("⚡ Fast mode: Skipping images.")
 
     with colC:
         st.markdown("### 3) Start review")
@@ -346,6 +363,7 @@ def main():
             manuscript_category=manuscript_category,
             study_design=study_design,
             has_ai=has_ai,
+            review_images=review_images,  # <--- Pass the new flag
             critic_model=preset["critic_model"],
             writer_model=preset["writer_model"],
             vision_model=preset["vision_model"],
@@ -367,7 +385,7 @@ def main():
                 cmd,
                 cwd=str(REPO_ROOT),
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, # Merge stderr into stdout
+                stderr=subprocess.STDOUT, 
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
@@ -379,14 +397,10 @@ def main():
                     text_line = line.strip()
                     collected.append(text_line)
 
-                    # --- PROGRESS HEURISTICS ---
                     lower_line = text_line.lower()
                     
-                    # 1. Catch the specific "Creating a new one" message
                     if "mean pooling" in lower_line or "creating a new one" in lower_line:
                         prog_bar.progress(15, text="🧠 Initializing Medical Knowledge (SciBERT)...")
-                    
-                    # 2. Other steps
                     elif "loading weights" in lower_line or "bertmodel" in lower_line:
                         prog_bar.progress(20, text="⏳ Loading AI models (this may take a moment)...")
                     elif "critic" in lower_line and "start" in lower_line:
@@ -407,7 +421,6 @@ def main():
                             for l in rest.splitlines():
                                 collected.append(l.strip())
                     break
-                # Tiny sleep to prevent CPU hogging
                 time.sleep(0.01)
 
         except Exception as e:
