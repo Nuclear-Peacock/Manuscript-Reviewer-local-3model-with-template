@@ -186,8 +186,9 @@ def build_cli_command(
     }
     cat_value = category_map.get(manuscript_category, "other")
 
+    # ADDED "-u" HERE ---------------------------------- vvv
     cmd = [
-        sys.executable, "-m", "reviewer.cli",
+        sys.executable, "-u", "-m", "reviewer.cli",
         "--input", str(pdf_path),
         "--out", str(output_dir),
         "--manuscript_type", cat_value,
@@ -197,6 +198,7 @@ def build_cli_command(
         "--fig_dpi", str(int(image_clarity)),
         "--temperature", str(float(deliberate_random)),
     ]
+    # ------------------------------------------------------
 
     if manuscript_category == "Original Research" and study_design and study_design != "Not specified":
         cmd += ["--study_design", study_design]
