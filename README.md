@@ -1,145 +1,147 @@
-# Local Manuscript Reviewer (Radiology / Nuclear Medicine / MedEd / AI)
+Local Manuscript Reviewer (Radiology / Nuclear Medicine / Medical Education / AI)
 
-A privacy-first, **local** manuscript review assistant that runs on your computer.
+A local-only manuscript review assistant that helps you generate a structured, human-style peer review.
 
-You upload a manuscript PDF, click **Run Review**, and the tool produces:
+✅ Runs on your computer (localhost)
+✅ Manuscripts stay on your PC
+✅ Designed for radiology, nuclear medicine, medical education, and AI-in-radiology/education
 
-* a structured peer-review report (ready to paste into a journal portal)
-* a critic issue log (what to fix, prioritized)
-* figure/table notes (from the PDF page images)
+⚠️ Privacy / confidentiality (please read)
 
-This project is designed for expert review in **radiology, nuclear medicine, medical education, and AI in these domains**.
+No deployment needed. This tool is meant to run only on your computer.
 
----
+Do NOT deploy this app to any server.
 
-## What this tool does (in plain language)
+Do NOT use tunnels (ngrok / Cloudflare Tunnel / Streamlit Cloud).
 
-When you run a review, it performs three passes locally:
+Uploaded manuscripts are saved in private_inputs/ on your PC.
 
-1. **Critic pass**: finds problems and missing information (methods, statistics, reporting gaps, nomenclature)
-2. **Figure/Table pass**: reviews figures/tables by looking at rendered PDF page images
-3. **Writer pass**: produces a polished, structured reviewer report
+Outputs are saved in outputs/ on your PC.
 
-You pick a **Quality preset** (Best / Balanced / Fast) depending on your computer.
+If you are reviewing unpublished work, keeping this local helps protect confidentiality.
 
----
+Windows (One-Click UI Quickstart)
 
-## Privacy and confidentiality
+What you need (one time)
 
-* The app runs **only on your computer**.
-* The user interface opens at **[http://127.0.0.1:8501](http://127.0.0.1:8501)** (your own machine only).
-* Manuscripts are saved to a local folder: **private_inputs/**
-* Outputs are saved locally to: **outputs/**
-* Nothing is automatically uploaded to the internet.
+Python 3.10+
 
-**Important:** This repo is public. Do **not** commit manuscripts or outputs to GitHub.
+Download from the official Python website.
 
----
+During install, check “Add Python to PATH.”
 
-## What you need (only if you don’t already have it)
+Ollama (local LLM runner)
 
-You may already have these installed. If so, you can skip installation.
+Install Ollama.
 
-1. **Python 3.10 or newer**
-2. **Ollama** (runs the local language models)
+Open Ollama once so it is running.
 
-That’s it.
+Start the UI
 
----
+Start Ollama.
 
-## Quickstart (Windows — no VS Code required)
+Double-click run_ui.bat.
 
-These steps are written for people who are not programmers.
+Your browser should open automatically at:
 
-### Step 1 — Download the project
+http://127.0.0.1:8501
 
-1. Open the GitHub page for this project.
-2. Click the green **Code** button.
-3. Click **Download ZIP**.
-4. Unzip it somewhere easy to find (for example: `Documents\\ManuscriptReviewer`).
+If the browser does not open, manually open Chrome/Edge and go to that address.
 
-### Step 2 — Start Ollama (if you use it already, just make sure it’s running)
+Stop the UI
 
-1. Open **Ollama**.
-2. Make sure it is running in the background.
+Close the browser tab.
 
-### Step 3 — One-click start
+Go to the black terminal window and press Ctrl+C.
 
-1. In the project folder, double-click **run_ui.bat**.
-2. The first run may take a few minutes.
-3. Your web browser should open automatically.
+Using the UI (simple)
 
-If the tool says some models are missing, choose **Yes** to install them.
+Upload your manuscript PDF (drag-and-drop is fine).
 
-### Step 4 — Run a review
+Choose:
 
-1. In the browser page, click **Upload PDF** and choose the manuscript.
-2. Choose a **Quality preset**:
+Medium quality, Medium speed (recommended)
 
-   * **Best**: highest quality, needs a strong GPU
-   * **Balanced**: great quality, faster for many GPUs
-   * **Fast**: for broader hardware compatibility
-3. Choose the manuscript type and study design.
-4. Click **Run review**.
+Choose the manuscript category (and study design if it is original research).
 
-### Step 5 — Find your files
+Click Start review.
 
-* Your manuscript copy is saved in: **private_inputs/**
-* Your review outputs are saved in: **outputs/**
+Download your report from Results.
 
----
+What you get (outputs)
 
-## Using the Quality preset dropdown
+Your results are saved locally to outputs/ and are also available as download buttons in the UI.
 
-* **Best (Max quality; high VRAM)**
+Common files:
 
-  * Slowest but strongest. Recommended for final, high-stakes reviews.
+*_review.md — the main structured review
 
-* **Balanced (Great quality; faster)**
+critic_issue_log.md — critic pass notes (issues/questions)
 
-  * Usually the best everyday option.
+figure_notes.txt — figure/table notes (vision model)
 
-* **Fast (Good quality; widest hardware)**
+reporting_checklist_gaps.json — reporting checklist gaps (if produced)
 
-  * Useful for laptops / smaller GPUs.
+Uploads are stored in:
 
-Tip: If the review feels slow, switch from **Best → Balanced**.
+private_inputs/
 
----
+Troubleshooting (common)
 
-## Troubleshooting (common issues)
+“Ollama not reachable”
 
-### “Python not found”
+Open Ollama and make sure it is running.
 
-* Install Python 3.10+.
-* During installation, ensure **“Add Python to PATH”** is checked.
-* Then run **run_ui.bat** again.
+“Missing model(s)”
 
-### “Ollama is not reachable”
+Run setup_models.bat and choose the recommended option.
 
-* Start the Ollama application.
-* Then run **run_ui.bat** again.
+Then re-run run_ui.bat.
 
-### The first review takes a long time
+The UI loads but the review does not start
 
-* The first run may download and set up models.
-* After that, reviews are faster.
-* If it is still too slow, choose **Balanced**.
+First run can be slow while models warm up.
 
-### Where are my results?
+Wait ~30–60 seconds and try again.
 
-* Reviews are in **outputs/**
-* Uploaded manuscripts are in **private_inputs/**
+I double-click run_ui.bat and nothing happens
 
----
+Right-click run_ui.bat → Run as administrator (rare)
 
-## For advanced users
+Or open Command Prompt in the repo folder and run:
 
-* CLI is available via `python -m reviewer.cli ...`
-* The local UI is `app.py` (Streamlit, localhost-only)
+run_ui.bat
 
----
+Model quality presets (plain English)
 
-## License
+In the UI you can choose:
+
+High quality, Low speed — best review quality, slowest
+
+Medium quality, Medium speed — recommended balance
+
+Low quality, High speed — fastest quick pass
+
+The app uses multiple local models:
+
+Critic: DeepSeek-R1
+
+Writer: Llama 3.3
+
+Vision (figures/tables): Qwen2.5-VL
+
+Advanced (optional)
+
+Where settings live
+
+Review rubric / prompts / templates are in config/
+
+Running from the command line (optional)
+
+If you prefer not to use the UI:
+
+See reviewer/cli.py
+
+License
 
 MIT License
