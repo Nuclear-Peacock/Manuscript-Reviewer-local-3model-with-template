@@ -10,10 +10,7 @@ from pathlib import Path
 
 # --- Configuration ---
 REQUIRED_MODELS = [
-    # Vision
     "qwen2.5vl:7b",
-    
-    # Medium Set (The Default)
     "deepseek-r1:32b",
     "llama3.3",
 ]
@@ -63,9 +60,7 @@ def check_and_pull_models():
         return
 
     for model in REQUIRED_MODELS:
-        # Check if the specific model tag exists
         found = any(model in tag for tag in installed_tags)
-        
         if not found:
             log(f"Model '{model}' is missing. Pulling now (this may take a while)...")
             try:
@@ -76,27 +71,61 @@ def check_and_pull_models():
         else:
             log(f"Model '{model}' is ready.")
 
+def check_scibert_download():
+    """
+    Checks if SciBERT is cached. If not, downloads it visibly in this window
+    so the user doesn't think the app is frozen.
+    """
+    log("Checking SciBERT (Medical AI Brain)...")
+    
+    # We run a tiny python script in a subprocess to check/download
+    check_script = """
+import sys
+try:
+    from sentence_transformers import SentenceTransformer
+    # This will download if missing, or return instantly if cached
+    model = SentenceTransformer('allenai/scibert_scivocab_uncased')
+except Exception as e:
+    sys.exit(1)
+"""
+    try:
+        # Run the check. If it takes time, the user sees "Checking..."
+        # We capture output to keep it clean, unless it fails.
+        subprocess.run([sys.executable, "-c", check_script], check=True)
+        log("✅ SciBERT is ready.")
+    except subprocess.CalledProcessError:
+        log("⚠️ SciBERT missing. Downloading now (approx 440MB)...")
+        try:
+            # Re-run with output visible so they see progress if possible
+            subprocess.run([sys.executable, "-c", check_script], check=True)
+            log("✅ SciBERT download complete.")
+        except:
+            log("❌ Failed to download SciBERT. The app might crash later.")
+
 def main():
     log("--- Local Manuscript Reviewer Launcher ---")
 
     # 1. Check Python Dependencies
     try:
         import streamlit
+        import pymupdf  # Check for the one we just added
     except ImportError:
-        log("Streamlit is missing. Installing requirements...")
+        log("Installing missing requirements...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
 
-    # 2. Check Ollama (Seamless)
+    # 2. Check SciBERT (The "Fix" is now here)
+    check_scibert_download()
+
+    # 3. Check Ollama (Seamless)
     wait_for_ollama_seamlessly()
 
-    # 3. Check Models (Auto-Setup)
+    # 4. Check Models (Auto-Setup)
     check_and_pull_models()
 
-    # 4. Run App (Auto-Launch Browser)
+    # 5. Run App (Auto-Launch Browser)
     log("🚀 Starting User Interface...")
     app_path = REPO_ROOT / "app.py"
     
-    # We add "--server.headless", "false" to FORCE the browser to open
     cmd = [
         sys.executable, "-m", "streamlit", "run", str(app_path),
         "--server.headless", "false"
