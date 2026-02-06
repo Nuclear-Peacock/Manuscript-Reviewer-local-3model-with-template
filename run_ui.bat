@@ -51,14 +51,14 @@ REM 6) Ensure folders exist
 if not exist "private_inputs" mkdir "private_inputs" >nul 2>&1
 if not exist "outputs" mkdir "outputs" >nul 2>&1
 
-REM 7) Check required models for Balanced
+REM 7) Check required models for Balanced (recommended)
 set "MISSING=0"
 echo Checking required models (Balanced)...
 call :CHECK_MODEL "deepseek-r1:32b"
 call :CHECK_MODEL "llama3.3:70b"
 call :CHECK_MODEL "qwen2.5vl:7b"
 
-REM ---- LOOP BREAKER ----
+REM LOOP BREAKER:
 REM If setup_models launched us, it sets SKIP_MODEL_SETUP=1
 REM In that case we must NOT call setup_models again.
 if "%SKIP_MODEL_SETUP%"=="1" (
@@ -75,7 +75,7 @@ if "%SKIP_MODEL_SETUP%"=="1" (
 REM If missing and NOT skipping, offer to install
 if "%MISSING%"=="1" (
   echo.
-  echo Some required models are missing.
+  echo Some required models are missing (or not detectable).
   echo.
   choice /c YN /m "Install recommended models now?"
   if errorlevel 2 (
@@ -86,6 +86,7 @@ if "%MISSING%"=="1" (
       pause
       exit /b 1
     )
+
     call "setup_models.bat" recommended
     if errorlevel 1 (
       echo ERROR: model install failed.
@@ -98,9 +99,15 @@ if "%MISSING%"=="1" (
     call :CHECK_MODEL "deepseek-r1:32b"
     call :CHECK_MODEL "llama3.3:70b"
     call :CHECK_MODEL "qwen2.5vl:7b"
+
     if "%MISSING%"=="1" (
-      echo ERROR: still missing models.
-      echo Run setup_models.bat manually and choose option 1.
+      echo.
+      echo ERROR: Models still not detected.
+      echo Run: ollama list
+      echo And confirm those exact tags exist:
+      echo   deepseek-r1:32b
+      echo   llama3.3:70b
+      echo   qwen2.5vl:7b
       pause
       exit /b 1
     )
@@ -116,7 +123,8 @@ exit /b 0
 
 
 :CHECK_MODEL
-ollama list | findstr /i /r "^%~1[ ]" >nul 2>&1
+REM Robust check: ollama show returns 0 if model exists locally
+ollama show %~1 >nul 2>&1
 if errorlevel 1 (
   echo MISSING: %~1
   set "MISSING=1"
@@ -153,3 +161,4 @@ echo ERROR: Ollama not reachable at http://localhost:11434
 echo Start Ollama and try again.
 pause
 exit /b 1
+
