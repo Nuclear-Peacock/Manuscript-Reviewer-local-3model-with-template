@@ -2,15 +2,11 @@ import os
 import re
 import sys
 import time
-import json
-import shutil
 import hashlib
-import textwrap
 import subprocess
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Optional, Tuple
 
 import streamlit as st
 
@@ -26,12 +22,8 @@ OUTPUTS_ROOT.mkdir(parents=True, exist_ok=True)
 APP_TITLE = "Local Manuscript Reviewer"
 APP_SUBTITLE = "Radiology • Nuclear Medicine • Medical Education • AI-in-Radiology/Education"
 
-# ----------------------------
-# UI wording (your preferences)
-# ----------------------------
 MANUSCRIPT_CATEGORIES = ["Original Research", "Review Article", "Other"]
 
-# Optional study design list (kept simple + editable)
 STUDY_DESIGNS = [
     "Not specified",
     "Prospective cohort",
@@ -54,7 +46,7 @@ PRESETS = {
         "writer_model": "llama3.3",
         "vision_model": "qwen2.5-vl",
         "image_clarity": 260,
-        "deliberate_random": 0.25,  # more deliberate
+        "deliberate_random": 0.25,
     },
     "Medium quality, Medium speed": {
         "critic_model": "deepseek-r1",
@@ -68,33 +60,31 @@ PRESETS = {
         "writer_model": "llama3.3",
         "vision_model": "qwen2.5-vl",
         "image_clarity": 180,
-        "deliberate_random": 0.65,  # more random
+        "deliberate_random": 0.65,
     },
 }
 
-
 # ----------------------------
-# Minimal styling (clean + airy)
+# Streamlit config + minimal CSS
 # ----------------------------
 st.set_page_config(page_title=APP_TITLE, page_icon="🧾", layout="wide")
 st.markdown(
     """
 <style>
-.block-container { padding-top: 1.2rem; padding-bottom: 2rem; }
+.block-container { padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1200px; }
 h1, h2, h3 { letter-spacing: -0.02em; }
-.small-note { color: rgba(250,250,250,0.75); font-size: 0.92rem; }
 .card {
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 14px;
   padding: 14px 16px;
   background: rgba(255,255,255,0.03);
 }
-hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 1.1rem 0; }
+hr { border: none; border-top: 1px solid rgba(255,255,255,0.10); margin: 1.1rem 0; }
+.small { color: rgba(255,255,255,0.75); font-size: 0.92rem; }
 </style>
 """,
     unsafe_allow_html=True,
 )
-
 
 # ----------------------------
 # Helpers
@@ -117,50 +107,42 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()[:16]
 
 
-def _run(cmd: List[str], cwd: Optional[Path] = None, timeout: Optional[int] = None) -> Tuple[int, str]:
-    """Run command, return (returncode, combined_output)."""
-    try:
-        p = subprocess.run(
-            cmd,
-            cwd=str(cwd) if cwd else None,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-        return p.returncode, p.stdout
-    except Exception as e:
-        return 999, f"[Error] Failed to run command: {e}"
+def human_bytes(n: int) -> str:
+    x = float(n)
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+        if x < 1024 or unit == "TB":
+            return f"{x:.0f} {unit}" if unit == "B" else f"{x:.1f} {unit}"
+        x /= 1024
+    return f"{x:.1f} TB"
 
 
-@st.cache_data(show_spinner=False)
-def discover_cli_flags() -> Set[str]:
-    """
-    Ask reviewer.cli what flags it supports by calling '--help'.
-    Then we only pass flags that exist, which makes the UI robust.
-    """
-    cmd = [sys.executable, "-m", "reviewer.cli", "--help"]
-    code, out = _run(cmd, cwd=REPO_ROOT, timeout=25)
-    if code != 0 and "No module named" in out:
-        # If module isn't importable, return empty; UI will show a helpful error.
-        return set()
+def list_output_files(folder: Path) -> List[Path]:
+    if not folder.exists():
+        return []
+    files = [p for p in folder.rglob("*") if p.is_file()]
 
-    flags = set(re.findall(r"(--[A-Za-z0-9][A-Za-z0-9_-]*)", out))
-    # Also accept short flags like -i, -o if present (rare but possible)
-    flags.update(re.findall(r"(\-[A-Za-z])\b", out))
-    return flags
+    priority_substrings = [
+        "_review.md",
+        "review.md",
+        "peer",
+        "critic",
+        "checklist",
+        "figure",
+        "table",
+        ".md",
+        ".json",
+        ".txt",
+    ]
 
+    def score(p: Path):
+        name = p.name.lower()
+        pri = next((i for i, s in enumerate(priority_substrings) if s in name), len(priority_substrings))
+        return (pri, name)
 
-def pick_first_existing_flag(existing: Set[str], candidates: List[str]) -> Optional[str]:
-    for c in candidates:
-        if c in existing:
-            return c
-    return None
+    return sorted(files, key=score)
 
 
 def build_cli_command(
-    existing_flags: Set[str],
     pdf_path: Path,
     output_dir: Path,
     manuscript_category: str,
@@ -170,42 +152,13 @@ def build_cli_command(
     vision_model: str,
     image_clarity: int,
     deliberate_random: float,
-) -> Tuple[List[str], Dict[str, str]]:
+) -> List[str]:
     """
-    Build a 'python -m reviewer.cli ...' command.
-    Only includes args that exist in the real CLI.
-    Returns (cmd, arg_debug_map).
+    IMPORTANT: This function does NOT probe the CLI.
+    It builds a command using common/expected flags.
+
+    If your CLI uses different flag names, edit them here once and you’re done.
     """
-    cmd = [sys.executable, "-m", "reviewer.cli"]
-    debug = {}
-
-    # Input PDF flag (try common names)
-    pdf_flag = pick_first_existing_flag(
-        existing_flags,
-        ["--pdf", "--pdf_path", "--input_pdf", "--input", "--manuscript_pdf", "-i"],
-    )
-    if pdf_flag:
-        cmd += [pdf_flag, str(pdf_path)]
-        debug["pdf"] = f"{pdf_flag} {pdf_path}"
-    else:
-        # Fallback: last resort positional (some CLIs accept it)
-        cmd += [str(pdf_path)]
-        debug["pdf"] = f"(positional) {pdf_path}"
-
-    # Output directory flag (try common names)
-    out_flag = pick_first_existing_flag(
-        existing_flags,
-        ["--output_dir", "--out_dir", "--output", "--outputs", "-o"],
-    )
-    if out_flag:
-        cmd += [out_flag, str(output_dir)]
-        debug["output"] = f"{out_flag} {output_dir}"
-    else:
-        debug["output"] = "(no output flag detected; CLI default will be used)"
-
-    # Manuscript category (your CLI arg mentioned as --manuscript_type)
-    # We'll pass a normalized string but keep it human-safe.
-    # Examples: original_research, review_article, other
     category_map = {
         "Original Research": "original_research",
         "Review Article": "review_article",
@@ -213,40 +166,245 @@ def build_cli_command(
     }
     cat_value = category_map.get(manuscript_category, "other")
 
-    cat_flag = pick_first_existing_flag(existing_flags, ["--manuscript_type", "--manuscript_category", "--type"])
-    if cat_flag:
-        cmd += [cat_flag, cat_value]
-        debug["manuscript_type"] = f"{cat_flag} {cat_value}"
-    else:
-        debug["manuscript_type"] = "(no manuscript type flag detected)"
+    cmd = [
+        sys.executable, "-m", "reviewer.cli",
+        "--pdf", str(pdf_path),
+        "--output_dir", str(output_dir),
+        "--manuscript_type", cat_value,
+        "--critic_model", critic_model,
+        "--writer_model", writer_model,
+        "--vision_model", vision_model,
+        "--dpi", str(int(image_clarity)),
+        "--temperature", str(float(deliberate_random)),
+    ]
 
-    # Study design (optional)
-    if study_design and study_design != "Not specified":
-        design_flag = pick_first_existing_flag(existing_flags, ["--study_design", "--design"])
-        if design_flag:
-            cmd += [design_flag, study_design]
-            debug["study_design"] = f"{design_flag} {study_design}"
-        else:
-            debug["study_design"] = "(no study design flag detected)"
+    # Optional study design (only for original research, if provided)
+    if manuscript_category == "Original Research" and study_design and study_design != "Not specified":
+        cmd += ["--study_design", study_design]
 
-    # Models
-    critic_flag = pick_first_existing_flag(existing_flags, ["--critic_model", "--critic"])
-    if critic_flag:
-        cmd += [critic_flag, critic_model]
-        debug["critic_model"] = f"{critic_flag} {critic_model}"
+    # If your CLI supports a boolean flag for image conversion / vision, add it here:
+    # cmd += ["--pdf_to_images"]
 
-    writer_flag = pick_first_existing_flag(existing_flags, ["--writer_model", "--writer"])
-    if writer_flag:
-        cmd += [writer_flag, writer_model]
-        debug["writer_model"] = f"{writer_flag} {writer_model}"
+    return cmd
 
-    vision_flag = pick_first_existing_flag(existing_flags, ["--vision_model", "--vision"])
-    if vision_flag:
-        cmd += [vision_flag, vision_model]
-        debug["vision_model"] = f"{vision_flag} {vision_model}"
 
-    # Image clarity (your “DPI” rename)
-    dpi_flag = pick_first_existing_flag(existing_flags, ["--dpi", "--image_dpi", "--render_dpi", "--page_dpi"])
-    if dpi_flag:
-        cmd
+def run_with_live_log(cmd: List[str], cwd: Path) -> Tuple[int, List[str]]:
+    """
+    Run a subprocess and stream output lines as they arrive.
+    Returns (return_code, log_lines).
+    """
+    p = subprocess.Popen(
+        cmd,
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True,
+    )
+    lines: List[str] = []
+    while True:
+        line = p.stdout.readline() if p.stdout else ""
+        if line:
+            lines.append(line.rstrip("\n"))
+        if p.poll() is not None:
+            if p.stdout:
+                rest = p.stdout.read()
+                if rest:
+                    lines.extend([x.rstrip("\n") for x in rest.splitlines()])
+            break
+        time.sleep(0.02)
+    return p.returncode, lines
 
+
+# ----------------------------
+# Header
+# ----------------------------
+st.title(f"🧾 {APP_TITLE}")
+st.caption(APP_SUBTITLE)
+
+# ----------------------------
+# Sidebar settings
+# ----------------------------
+with st.sidebar:
+    st.markdown("### Privacy / confidentiality")
+    st.markdown(
+        """
+<div class="card">
+<b>No deployment needed.</b> This is meant to run only on your computer.<br><br>
+<b>Do not deploy this app.</b><br>
+• Do NOT deploy to any server<br>
+• Do NOT use tunnels (ngrok / Cloudflare Tunnel / Streamlit Cloud)<br>
+• Uploads are saved locally to <code>private_inputs/</code><br>
+• Outputs are saved locally to <code>outputs/</code>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("---")
+    st.markdown("### Choose the Critic/Writer Model Quality and Performance")
+    preset_name = st.selectbox("Model preset", list(PRESETS.keys()), index=1)
+    preset = PRESETS[preset_name]
+
+    st.markdown("### Advanced settings")
+    image_clarity = st.slider(
+        "Image clarity (higher = sharper, slower)",
+        min_value=120,
+        max_value=320,
+        value=int(preset["image_clarity"]),
+        step=10,
+    )
+
+    deliberate_random = st.slider(
+        "Deliberate ↔ Random",
+        min_value=0.05,
+        max_value=1.00,
+        value=float(preset["deliberate_random"]),
+        step=0.05,
+        help="Lower feels more deliberate/consistent. Higher feels more random/creative.",
+    )
+
+    with st.expander("Model details (optional)"):
+        critic_model = st.text_input("Critic model", value=preset["critic_model"])
+        writer_model = st.text_input("Writer model", value=preset["writer_model"])
+        vision_model = st.text_input("Vision model", value=preset["vision_model"])
+
+    st.markdown("---")
+    local_only_confirm = st.checkbox(
+        "I confirm I will run this locally only (no deployment, no tunnels).",
+        value=False,
+    )
+
+
+# ----------------------------
+# Main workflow
+# ----------------------------
+st.markdown("## Workflow")
+
+colA, colB, colC = st.columns([1.2, 1, 1])
+
+with colA:
+    st.markdown("### 1) Upload PDF")
+    uploaded = st.file_uploader("Manuscript PDF", type=["pdf"], accept_multiple_files=False)
+    st.caption("Saved locally into `private_inputs/` (not uploaded anywhere).")
+
+with colB:
+    st.markdown("### 2) Choose category")
+    manuscript_category = st.selectbox("Manuscript category", MANUSCRIPT_CATEGORIES, index=0)
+
+    study_design = None
+    if manuscript_category == "Original Research":
+        study_design = st.selectbox("Study design (optional)", STUDY_DESIGNS, index=0)
+
+with colC:
+    st.markdown("### 3) Start review")
+    st.caption("Runs locally using your local models (Ollama + GPU where configured).")
+    run_btn = st.button(
+        "Start review",
+        type="primary",
+        use_container_width=True,
+        disabled=(uploaded is None or not local_only_confirm),
+    )
+    if uploaded is None:
+        st.caption("Upload a PDF to enable Start review.")
+    elif not local_only_confirm:
+        st.caption("Confirm local-only use in the sidebar to enable Start review.")
+
+st.markdown("---")
+
+# ----------------------------
+# Run pipeline ONLY on button click
+# ----------------------------
+if run_btn:
+    # Save upload to private_inputs/
+    original_name = _safe_filename(uploaded.name)
+    tmp = PRIVATE_INPUTS / f"{_now_stamp()}__{original_name}"
+    with open(tmp, "wb") as f:
+        f.write(uploaded.getbuffer())
+
+    file_hash = _sha256_file(tmp)
+    pdf_path = PRIVATE_INPUTS / f"{tmp.stem}__{file_hash}.pdf"
+    tmp.rename(pdf_path)
+
+    # Unique output folder per run
+    run_id = f"{_now_stamp()}__{pdf_path.stem[:48]}"
+    output_dir = OUTPUTS_ROOT / run_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build command (NO probing / NO --help calls)
+    cmd = build_cli_command(
+        pdf_path=pdf_path,
+        output_dir=output_dir,
+        manuscript_category=manuscript_category,
+        study_design=study_design,
+        critic_model=critic_model,
+        writer_model=writer_model,
+        vision_model=vision_model,
+        image_clarity=image_clarity,
+        deliberate_random=deliberate_random,
+    )
+
+    st.markdown("### Running locally")
+    st.markdown(
+        f"""
+<div class="card">
+<b>Input:</b> <code>{pdf_path.relative_to(REPO_ROOT)}</code><br>
+<b>Output folder:</b> <code>{output_dir.relative_to(REPO_ROOT)}</code><br>
+<b>What’s happening:</b> Critic finds issues/questions, Writer produces a structured peer review,
+and Vision is used if your CLI supports image-based figure/table analysis.
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("Technical details (command)"):
+        st.code(" ".join(cmd), language="bash")
+
+    st.markdown("### Live log")
+    log_box = st.empty()
+
+    start = time.time()
+    try:
+        # Stream live output
+        # We’ll show the last ~300 lines to keep the UI snappy.
+        rc = 0
+        collected: List[str] = []
+
+        p = subprocess.Popen(
+            cmd,
+            cwd=str(REPO_ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
+        )
+
+        while True:
+            line = p.stdout.readline() if p.stdout else ""
+            if line:
+                collected.append(line.rstrip("\n"))
+                log_box.code("\n".join(collected[-300:]), language="text")
+            if p.poll() is not None:
+                if p.stdout:
+                    rest = p.stdout.read()
+                    if rest:
+                        for l in rest.splitlines():
+                            collected.append(l.rstrip("\n"))
+                rc = p.returncode
+                break
+            time.sleep(0.02)
+
+    except Exception as e:
+        st.error(f"Could not start the review process: {e}")
+        st.stop()
+
+    elapsed = time.time() - start
+
+    # Save log
+    run_log = output_dir / "run_log.txt"
+    run_log.write_text("\n".join(collected), encoding="utf-8")
+
+    st.markdown("---")
+    if
