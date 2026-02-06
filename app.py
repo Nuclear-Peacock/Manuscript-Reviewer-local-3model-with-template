@@ -365,7 +365,7 @@ def main():
                 cmd,
                 cwd=str(REPO_ROOT),
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.STDOUT, # Merge stderr into stdout
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
@@ -377,9 +377,16 @@ def main():
                     text_line = line.strip()
                     collected.append(text_line)
 
+                    # --- PROGRESS HEURISTICS ---
                     lower_line = text_line.lower()
-                    if "loading weights" in lower_line or "bertmodel" in lower_line:
-                        prog_bar.progress(10, text="⏳ Loading AI models (this may take a moment)...")
+                    
+                    # 1. Catch the specific "Creating a new one" message
+                    if "mean pooling" in lower_line or "creating a new one" in lower_line:
+                        prog_bar.progress(15, text="🧠 Initializing Medical Knowledge (SciBERT)...")
+                    
+                    # 2. Other steps
+                    elif "loading weights" in lower_line or "bertmodel" in lower_line:
+                        prog_bar.progress(20, text="⏳ Loading AI models (this may take a moment)...")
                     elif "critic" in lower_line and "start" in lower_line:
                         prog_bar.progress(30, text="🧐 Critic Agent: Reading and analyzing manuscript...")
                     elif "writer" in lower_line and "start" in lower_line:
@@ -398,6 +405,7 @@ def main():
                             for l in rest.splitlines():
                                 collected.append(l.strip())
                     break
+                # Tiny sleep to prevent CPU hogging
                 time.sleep(0.01)
 
         except Exception as e:
