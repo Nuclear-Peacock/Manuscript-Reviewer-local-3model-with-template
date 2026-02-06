@@ -2,5 +2,4 @@ streamlit>=1.30.0
 pypdf>=3.17.0
 httpx>=0.25.0
 pathlib
-# Note: We do not need the 'ollama' python library because
-# we talk to the Ollama executable directly via subprocess.
+ollama>=0.1.6
