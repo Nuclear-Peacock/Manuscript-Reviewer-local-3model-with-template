@@ -22,3 +22,12 @@ outputs/
 
 # Logs
 *.log
+
+# Ignore the contents of these folders...
+private_inputs/*
+outputs/*
+
+# ...but keep the folders themselves (by allowing the .gitkeep file)
+!private_inputs/.gitkeep
+!outputs/.gitkeep
+
