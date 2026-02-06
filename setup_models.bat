@@ -2,6 +2,23 @@
 setlocal
 cd /d "%~dp0"
 
+REM ----------------------------------------------------------
+REM Non-interactive modes (called from run_ui.bat)
+REM Usage:
+REM   setup_models.bat recommended
+REM   setup_models.bat best
+REM   setup_models.bat all
+REM   setup_models.bat list
+REM ----------------------------------------------------------
+
+if /I "%~1"=="recommended" goto RECOMMENDED
+if /I "%~1"=="best" goto BEST
+if /I "%~1"=="all" goto ALL
+if /I "%~1"=="list" goto LIST
+
+goto MENU
+
+
 :MENU
 cls
 echo ==========================================================
@@ -17,7 +34,7 @@ echo  4) Show installed models
 echo  5) Exit
 echo.
 
-REM Verify Ollama is running before doing anything
+REM Verify Ollama is running
 curl -s http://localhost:11434/api/tags >nul 2>&1
 if errorlevel 1 (
   echo [ERROR] Ollama is not reachable at http://localhost:11434
@@ -33,7 +50,7 @@ if "%CHOICE%"=="1" goto RECOMMENDED
 if "%CHOICE%"=="2" goto BEST
 if "%CHOICE%"=="3" goto ALL
 if "%CHOICE%"=="4" goto LIST
-if "%CHOICE%"=="5" goto END
+if "%CHOICE%"=="5" exit /b 0
 
 echo.
 echo Invalid choice. Please enter 1-5.
@@ -44,7 +61,7 @@ goto MENU
 :RECOMMENDED
 echo.
 echo [INFO] Installing Recommended (Minimal) models...
-echo       This supports the Balanced preset (and usually runs well on many GPUs).
+echo       Supports the Balanced preset + vision model.
 echo.
 set MODELS=deepseek-r1:32b llama3.3:70b qwen2.5vl:7b
 goto INSTALL
@@ -53,7 +70,7 @@ goto INSTALL
 :BEST
 echo.
 echo [INFO] Installing Best Quality models...
-echo       Warning: this can be very large and may require a strong GPU + lots of disk.
+echo       Warning: very large downloads, requires strong GPU + disk.
 echo.
 set MODELS=deepseek-r1:70b llama3.3:70b qwen2.5vl:7b
 goto INSTALL
@@ -73,28 +90,35 @@ echo [INFO] Installed models:
 echo.
 ollama list
 echo.
-pause
-goto MENU
+if "%~1"=="" pause
+exit /b 0
 
 
 :INSTALL
-REM Pull each model if missing
+REM Verify Ollama is running (again, for safety)
+curl -s http://localhost:11434/api/tags >nul 2>&1
+if errorlevel 1 (
+  echo [ERROR] Ollama is not reachable at http://localhost:11434
+  if "%~1"=="" pause
+  exit /b 1
+)
+
 for %%M in (%MODELS%) do (
   call :ENSURE_MODEL "%%M"
 )
 
 echo.
 echo [DONE] Model setup complete.
-echo You can now run: run_ui.bat
-echo.
-pause
-goto MENU
+if "%~1"=="" (
+  pause
+  goto MENU
+)
+exit /b 0
 
 
 :ENSURE_MODEL
 set "MODEL=%~1"
 
-REM Check if installed
 ollama list | findstr /i /r "^%MODEL%[ ]" >nul 2>&1
 if errorlevel 1 (
   echo [PULL] %MODEL%
@@ -106,15 +130,11 @@ if errorlevel 1 (
     echo         - Check free disk space
     echo         - Model name/tag may differ in your Ollama version
     echo.
-    pause
+    if "%~1"=="" pause
     exit /b 1
   )
 ) else (
   echo [OK]   %MODEL% (already installed)
 )
 
-exit /b 0
-
-
-:END
 exit /b 0
