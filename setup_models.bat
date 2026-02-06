@@ -5,16 +5,9 @@ cd /d "%~dp0"
 REM ==========================================================
 REM setup_models.bat
 REM - Installs missing Ollama models
-REM - Auto-launches run_ui.bat ONLY in interactive mode
-REM - If called with args (recommended/best/fast/all/list), it does NOT launch UI
+REM - If double-clicked (interactive), launches run_ui.bat
+REM - If called with args (recommended/best/fast/all/list), installs and exits (no launch)
 REM ==========================================================
-
-REM Argument modes (non-interactive; NO auto-launch):
-REM   setup_models.bat recommended
-REM   setup_models.bat best
-REM   setup_models.bat fast
-REM   setup_models.bat all
-REM   setup_models.bat list
 
 if /I "%~1"=="recommended" goto RECOMMENDED_ARG
 if /I "%~1"=="best" goto BEST_ARG
@@ -31,9 +24,7 @@ echo ==========================================================
 echo   Model Setup - Local Manuscript Reviewer (Ollama)
 echo ==========================================================
 echo.
-echo This installs models locally (safe to re-run).
-echo After installing (or confirming they already exist),
-echo it will start the app automatically.
+echo After setup, it will launch the app automatically.
 echo.
 echo  1) Recommended (Balanced)
 echo     deepseek-r1:32b + llama3.3:70b + qwen2.5vl:7b
@@ -65,15 +56,11 @@ if "%CHOICE%"=="4" goto ALL_UI
 if "%CHOICE%"=="5" goto LIST_UI
 if "%CHOICE%"=="6" goto END
 
-echo.
 echo Invalid choice.
 pause
 goto MENU
 
 
-REM =========================
-REM UI (interactive) routes
-REM =========================
 :RECOMMENDED_UI
 set MODELS=deepseek-r1:32b llama3.3:70b qwen2.5vl:7b
 call :INSTALL_MODELS
@@ -113,10 +100,7 @@ pause
 goto LAUNCH_UI
 
 
-REM =========================
-REM ARG (non-interactive) routes
-REM (install and EXIT; no launch)
-REM =========================
+REM ---- ARG MODES: install and exit (NO LAUNCH) ----
 :RECOMMENDED_ARG
 set MODELS=deepseek-r1:32b llama3.3:70b qwen2.5vl:7b
 call :INSTALL_MODELS
@@ -144,9 +128,6 @@ ollama list
 exit /b 0
 
 
-REM =========================
-REM Helpers
-REM =========================
 :INSTALL_MODELS
 call :CHECK_OLLAMA
 if errorlevel 1 exit /b 1
@@ -186,8 +167,8 @@ exit /b 0
 curl -s http://localhost:11434/api/tags >nul 2>&1
 if errorlevel 1 (
   echo.
-  echo ERROR: Ollama is not reachable at http://localhost:11434
-  echo Start Ollama, then re-run.
+  echo ERROR: Ollama not reachable at http://localhost:11434
+  echo Start Ollama and re-run.
   echo.
   exit /b 1
 )
@@ -203,6 +184,9 @@ if not exist "run_ui.bat" (
   pause
   exit /b 1
 )
+
+REM ---- LOOP BREAKER FLAG ----
+set "SKIP_MODEL_SETUP=1"
 
 call "run_ui.bat"
 
