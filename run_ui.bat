@@ -43,7 +43,9 @@ echo [INFO] Installing/updating Python dependencies (first run may take a few mi
 pip install -r requirements.txt >nul
 if errorlevel 1 (
   echo [ERROR] pip install -r requirements.txt failed.
-  echo         Try: pip install --upgrade pip
+  echo         Try running this in Command Prompt:
+  echo         .venv\Scripts\python.exe -m pip install --upgrade pip
+  echo         Then re-run run_ui.bat
   pause
   exit /b 1
 )
@@ -74,7 +76,6 @@ REM -------------------------
 set NEED_MODELS=deepseek-r1:70b deepseek-r1:32b deepseek-r1:14b llama3.3:70b llama3.3:32b qwen2.5vl:7b
 set MISSING_ANY=0
 
-REM capture installed model names (first token per line)
 if exist "%TEMP%\ollama_models_ui.txt" del "%TEMP%\ollama_models_ui.txt" >nul 2>&1
 for /f "delims=" %%A in ('ollama list 2^>nul') do (
   echo %%A | findstr /i /c:"NAME" >nul
@@ -125,7 +126,15 @@ if not exist private_inputs (
 )
 
 REM -------------------------
-REM 7) Launch local-only UI
+REM 7) Auto-open browser + launch UI (localhost only)
 REM -------------------------
 echo.
-echo [INFO] Starting UI (localhost
+echo [INFO] Starting UI (localhost only)...
+echo       Opening your browser at: http://127.0.0.1:8501
+echo.
+
+REM Open browser (safe even if server is still starting)
+start "" "http://127.0.0.1:8501"
+
+REM Run Streamlit bound to localhost only
+streamlit run app.py --server.address 127.0.0.1 --server.port 8501
