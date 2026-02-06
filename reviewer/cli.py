@@ -3,7 +3,6 @@ import logging
 import sys
 import os
 from pathlib import Path
-import json
 
 # Ensure we can find the modules in this package
 sys.path.append(str(Path(__file__).parent.parent))
@@ -17,12 +16,10 @@ except ImportError:
     sys.exit(1)
 
 # Import internal modules (assuming standard structure for this tool)
-# We use try/except to handle potential structure variations cleanly
 try:
     from reviewer.agents import CriticAgent, WriterAgent, VisionAgent
     from reviewer.utils import load_pdf_text, extract_images_from_pdf
 except ImportError:
-    # Fallback if run directly
     from agents import CriticAgent, WriterAgent, VisionAgent
     from utils import load_pdf_text, extract_images_from_pdf
 
@@ -67,7 +64,6 @@ def main():
     setup_logging(out_dir)
 
     logging.info(f"Starting review for: {pdf_path.name}")
-    logging.info(f"Type: {args.manuscript_type}, AI Study: {args.has_ai}")
 
     # 1. Text Extraction
     print("[1/5] Extracting PDF text...")
@@ -77,7 +73,7 @@ def main():
         logging.error(f"Failed to extract text: {e}")
         sys.exit(1)
 
-    # 2. Vision Analysis (OPTIONAL)
+    # 2. Vision Analysis (Conditional)
     vision_feedback = "No figure analysis requested (Fast Mode)."
     
     if args.vlm_model:
@@ -88,7 +84,7 @@ def main():
             # Initialize Vision Agent
             vision_agent = VisionAgent(model_name=args.vlm_model, temperature=args.temperature)
             
-            # Extract images (using the utility from your repo)
+            # Extract images
             image_paths = extract_images_from_pdf(pdf_path, out_dir / "figures", dpi=args.fig_dpi)
             
             if image_paths:
@@ -107,7 +103,6 @@ def main():
     print(f"[4/5] Running critic ({args.critic_model})...")
     critic = CriticAgent(model_name=args.critic_model, temperature=args.temperature)
     
-    # Pass all context to the critic
     critique = critic.review_manuscript(
         text=full_text,
         vision_context=vision_feedback,
@@ -116,6 +111,7 @@ def main():
         has_ai=args.has_ai
     )
     
+    # Save debug critique
     (out_dir / "critique_debug.md").write_text(critique, encoding="utf-8")
 
     # 4. Writer Agent
@@ -127,12 +123,18 @@ def main():
         manuscript_type=args.manuscript_type
     )
 
-    # Save
-    final_path = out_dir / f"Review_{pdf_path.stem}.md"
-    final_path.write_text(final_review, encoding="utf-8")
+    # 5. Save Final Output (FIXED: Ensure filename is valid)
+    safe_name = pdf_path.stem.replace(" ", "_")
+    final_path = out_dir / f"Review_{safe_name}.md"
     
-    print("Review completed.")
-    logging.info(f"Saved to {final_path}")
+    try:
+        final_path.write_text(final_review, encoding="utf-8")
+        print("Review completed.")
+        logging.info(f"Saved to {final_path}")
+    except Exception as e:
+        print(f"ERROR: Could not save file: {e}")
+        # Fallback save
+        (out_dir / "FINAL_REVIEW.md").write_text(final_review, encoding="utf-8")
 
 if __name__ == "__main__":
     main()
