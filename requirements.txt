@@ -4,3 +4,4 @@ httpx>=0.25.0
 pathlib
 ollama>=0.1.6
 pymupdf
+python-docx
