@@ -27,6 +27,32 @@ def is_ollama_running():
     except urllib.error.URLError:
         return False
 
+def wait_for_ollama_seamlessly():
+    """
+    Opens the download page once, then polls silently until Ollama appears.
+    """
+    if is_ollama_running():
+        return
+
+    log("❌ Ollama is not reachable.")
+    log("Attempting to open download page...", color="yellow")
+    webbrowser.open("https://ollama.com/download")
+    
+    print("\n" + "="*50)
+    print(" WAITING FOR OLLAMA...")
+    print(" 1. Please download/install Ollama.")
+    print(" 2. Open the 'Ollama' app.")
+    print(" 3. This script will resume AUTOMATICALLY once it connects.")
+    print("="*50 + "\n")
+
+    # Seamless Loop: Check every 3 seconds
+    while not is_ollama_running():
+        time.sleep(3)
+        print(".", end="", flush=True)
+    
+    print("") # Newline
+    log("✅ Ollama detected! Resuming...")
+
 def check_and_pull_models():
     log("Checking AI models...")
     try:
@@ -59,30 +85,8 @@ def main():
         log("Streamlit is missing. Installing requirements...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
 
-    # 2. Check Ollama (and direct to install if missing)
-    if not is_ollama_running():
-        log("❌ Ollama is not reachable.")
-        log("It might be closed, or not installed.")
-        log("Attempting to open download page...", color="yellow")
-        
-        # Open the browser to the download page
-        webbrowser.open("https://ollama.com/download")
-        
-        print("\n" + "="*50)
-        print(" INSTRUCTIONS:")
-        print(" 1. If you haven't installed Ollama, download and install it now.")
-        print(" 2. Open the 'Ollama' application from your Start Menu.")
-        print(" 3. When you see the little Ollama icon in your taskbar, come back here.")
-        print("="*50 + "\n")
-        
-        input("Press Enter once Ollama is running to continue...")
-        
-        # Re-check loop
-        while not is_ollama_running():
-            log("Still cannot connect to Ollama. Is the app running?")
-            input("Press Enter to try again...")
-            
-        log("✅ Ollama detected!")
+    # 2. Check Ollama (Seamless)
+    wait_for_ollama_seamlessly()
 
     # 3. Check Models (Auto-Setup)
     check_and_pull_models()
