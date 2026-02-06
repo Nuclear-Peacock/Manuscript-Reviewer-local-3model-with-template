@@ -1,20 +1,24 @@
-.venv/
+# Python artifacts
 __pycache__/
-*.pyc
-.DS_Store
-outputs/
-cache/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
 
-# --- SAFE PUBLIC DEMO EXCEPTIONS (synthetic only) ---
-!demo/
-!demo/**
-!demo/**/*.pdf
-!demo/**/*.png
-!demo/**/*.jpg
-!demo/**/*.jpeg
-!demo/**/*.webp
-!demo/**/*.svg
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
 
-# Real manuscripts should go here (never commit)
+# Local App Data (CRITICAL PRIVACY SETTINGS)
+# Never commit inputs or outputs to git
 private_inputs/
 outputs/
+*.pdf
+
+# IDE settings
+.vscode/
+.idea/
+
+# Logs
+*.log
