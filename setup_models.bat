@@ -2,7 +2,13 @@
 setlocal
 cd /d "%~dp0"
 
-REM Non-interactive modes:
+REM ==========================================================
+REM setup_models.bat
+REM - Installs missing Ollama models
+REM - Then launches run_ui.bat automatically
+REM ==========================================================
+
+REM If called with an argument, install that set without prompting:
 REM   setup_models.bat recommended
 REM   setup_models.bat best
 REM   setup_models.bat fast
@@ -24,22 +30,18 @@ echo ==========================================================
 echo   Model Setup - Local Manuscript Reviewer (Ollama)
 echo ==========================================================
 echo.
-echo Safe to re-run. Installs only missing models.
+echo This installs models locally (safe to re-run).
+echo After installing (or confirming they already exist),
+echo it will start the app automatically.
 echo.
 echo  1) Recommended (Balanced)
-echo     - deepseek-r1:32b
-echo     - llama3.3:70b
-echo     - qwen2.5vl:7b
+echo     deepseek-r1:32b + llama3.3:70b + qwen2.5vl:7b
 echo.
 echo  2) Best Quality (Very large)
-echo     - deepseek-r1:70b
-echo     - llama3.3:70b
-echo     - qwen2.5vl:7b
+echo     deepseek-r1:70b + llama3.3:70b + qwen2.5vl:7b
 echo.
 echo  3) Fast (Smaller / most compatible)
-echo     - deepseek-r1:14b
-echo     - llama3.1:8b
-echo     - qwen2.5vl:7b
+echo     deepseek-r1:14b + llama3.1:8b + qwen2.5vl:7b
 echo.
 echo  4) Install Everything (Largest)
 echo.
@@ -88,7 +90,7 @@ goto INSTALL
 :LIST
 call :CHECK_OLLAMA
 if errorlevel 1 (
-  if "%~1"=="" pause
+  pause
   exit /b 1
 )
 echo.
@@ -96,36 +98,35 @@ echo Installed models:
 echo.
 ollama list
 echo.
-if "%~1"=="" pause
-exit /b 0
+pause
+goto LAUNCH_UI
 
 
 :INSTALL
 call :CHECK_OLLAMA
 if errorlevel 1 (
-  if "%~1"=="" pause
+  pause
   exit /b 1
 )
 
 echo.
-echo Installing (only missing):
+echo Installing models (only missing ones will download):
+echo.
+
 for %%M in (%MODELS%) do (
   call :ENSURE_MODEL "%%M"
   if errorlevel 1 (
-    if "%~1"=="" pause
+    echo.
+    echo Setup failed. Fix the error above and re-run setup_models.bat.
+    pause
     exit /b 1
   )
 )
 
 echo.
-echo DONE. Models installed.
-echo You can run: run_ui.bat
+echo DONE. Model setup complete.
 echo.
-if "%~1"=="" (
-  pause
-  goto MENU
-)
-exit /b 0
+goto LAUNCH_UI
 
 
 :ENSURE_MODEL
@@ -135,8 +136,7 @@ if errorlevel 1 (
   echo PULL  %MODEL%
   ollama pull %MODEL%
   if errorlevel 1 (
-    echo.
-    echo ERROR: Failed to pull %MODEL%
+    echo ERROR pulling %MODEL%
     exit /b 1
   )
 ) else (
@@ -149,11 +149,30 @@ exit /b 0
 curl -s http://localhost:11434/api/tags >nul 2>&1
 if errorlevel 1 (
   echo.
-  echo ERROR: Ollama not reachable at http://localhost:11434
-  echo Start Ollama, then re-run.
+  echo ERROR: Ollama is not reachable at http://localhost:11434
+  echo Start Ollama, then run setup_models.bat again.
   echo.
   exit /b 1
 )
+exit /b 0
+
+
+:LAUNCH_UI
+echo Launching the app now...
+echo.
+
+if not exist "run_ui.bat" (
+  echo ERROR: run_ui.bat not found in this folder.
+  pause
+  exit /b 1
+)
+
+REM Use CALL so this window continues into run_ui.bat
+call "run_ui.bat"
+
+echo.
+echo App exited (or you closed it). Press any key to close this window.
+pause
 exit /b 0
 
 
