@@ -5,6 +5,7 @@ import shutil
 import urllib.request
 import urllib.error
 import json
+import webbrowser
 from pathlib import Path
 
 # --- Configuration ---
@@ -17,8 +18,6 @@ REQUIRED_MODELS = [
 REPO_ROOT = Path(__file__).resolve().parent
 
 def log(msg, color="white"):
-    """Simple logger with minimal ANSI colors for terminals that support it."""
-    # Windows cmd.exe often handles ANSI poorly without config, so we keep it simple or use colorama if available.
     print(f"[{time.strftime('%H:%M:%S')}] {msg}")
 
 def is_ollama_running():
@@ -29,10 +28,7 @@ def is_ollama_running():
         return False
 
 def check_and_pull_models():
-    """Checks for models and pulls them if missing."""
     log("Checking AI models...")
-    
-    # Get installed models
     try:
         with urllib.request.urlopen("http://localhost:11434/api/tags") as response:
             data = json.loads(response.read().decode())
@@ -42,14 +38,10 @@ def check_and_pull_models():
         return
 
     for model in REQUIRED_MODELS:
-        # Check if model (or a specific tag version of it) exists
-        # We look for partial match because 'deepseek-r1' might be 'deepseek-r1:latest'
         found = any(model in tag for tag in installed_tags)
-        
         if not found:
             log(f"Model '{model}' is missing. Pulling now (this may take a while)...")
             try:
-                # We use subprocess to allow the user to see the Ollama progress bar
                 subprocess.run(["ollama", "pull", model], check=True)
                 log(f"Successfully pulled {model}.")
             except subprocess.CalledProcessError:
@@ -61,24 +53,35 @@ def main():
     log("--- Local Manuscript Reviewer Launcher ---")
 
     # 1. Check Python Dependencies
-    # We assume if they are running this, they have python. 
-    # But we can check for streamlit.
     try:
         import streamlit
     except ImportError:
         log("Streamlit is missing. Installing requirements...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
 
-    # 2. Check Ollama
+    # 2. Check Ollama (and direct to install if missing)
     if not is_ollama_running():
-        log("❌ ERROR: Ollama is not running.")
-        log("Please open the 'Ollama' application on your computer.")
-        log("Waiting for Ollama to start...", color="yellow")
+        log("❌ Ollama is not reachable.")
+        log("It might be closed, or not installed.")
+        log("Attempting to open download page...", color="yellow")
         
+        # Open the browser to the download page
+        webbrowser.open("https://ollama.com/download")
+        
+        print("\n" + "="*50)
+        print(" INSTRUCTIONS:")
+        print(" 1. If you haven't installed Ollama, download and install it now.")
+        print(" 2. Open the 'Ollama' application from your Start Menu.")
+        print(" 3. When you see the little Ollama icon in your taskbar, come back here.")
+        print("="*50 + "\n")
+        
+        input("Press Enter once Ollama is running to continue...")
+        
+        # Re-check loop
         while not is_ollama_running():
-            time.sleep(2)
-            print(".", end="", flush=True)
-        print("") # Newline
+            log("Still cannot connect to Ollama. Is the app running?")
+            input("Press Enter to try again...")
+            
         log("✅ Ollama detected!")
 
     # 3. Check Models (Auto-Setup)
@@ -87,7 +90,6 @@ def main():
     # 4. Run App
     log("🚀 Starting User Interface...")
     app_path = REPO_ROOT / "app.py"
-    
     cmd = [sys.executable, "-m", "streamlit", "run", str(app_path)]
     
     try:
