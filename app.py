@@ -92,12 +92,10 @@ hr { border: none; border-top: 1px solid rgba(255,255,255,0.10); margin: 1.1rem 
 def _now_stamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-
 def _safe_filename(name: str) -> str:
     name = name.strip().replace(" ", "_")
     name = re.sub(r"[^A-Za-z0-9._-]", "", name)
     return name or f"manuscript_{_now_stamp()}.pdf"
-
 
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -105,7 +103,6 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()[:16]
-
 
 def human_bytes(n: int) -> str:
     x = float(n)
@@ -115,23 +112,14 @@ def human_bytes(n: int) -> str:
         x /= 1024
     return f"{x:.1f} TB"
 
-
 def list_output_files(folder: Path) -> List[Path]:
     if not folder.exists():
         return []
     files = [p for p in folder.rglob("*") if p.is_file()]
 
     priority_substrings = [
-        "_review.md",
-        "review.md",
-        "peer",
-        "critic",
-        "checklist",
-        "figure",
-        "table",
-        ".md",
-        ".json",
-        ".txt",
+        "_review.md", "review.md", "peer", "critic", "checklist",
+        "figure", "table", ".md", ".json", ".txt",
     ]
 
     def score(p: Path):
@@ -140,7 +128,6 @@ def list_output_files(folder: Path) -> List[Path]:
         return (pri, name)
 
     return sorted(files, key=score)
-
 
 def build_cli_command(
     pdf_path: Path,
@@ -153,12 +140,6 @@ def build_cli_command(
     image_clarity: int,
     deliberate_random: float,
 ) -> List[str]:
-    """
-    IMPORTANT: This function does NOT probe the CLI.
-    It builds a command using common/expected flags.
-
-    If your CLI uses different flag names, edit them here once and you’re done.
-    """
     category_map = {
         "Original Research": "original_research",
         "Review Article": "review_article",
@@ -178,233 +159,209 @@ def build_cli_command(
         "--temperature", str(float(deliberate_random)),
     ]
 
-    # Optional study design (only for original research, if provided)
     if manuscript_category == "Original Research" and study_design and study_design != "Not specified":
         cmd += ["--study_design", study_design]
 
-    # If your CLI supports a boolean flag for image conversion / vision, add it here:
-    # cmd += ["--pdf_to_images"]
-
     return cmd
 
-
-def run_with_live_log(cmd: List[str], cwd: Path) -> Tuple[int, List[str]]:
-    """
-    Run a subprocess and stream output lines as they arrive.
-    Returns (return_code, log_lines).
-    """
-    p = subprocess.Popen(
-        cmd,
-        cwd=str(cwd),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        universal_newlines=True,
-    )
-    lines: List[str] = []
-    while True:
-        line = p.stdout.readline() if p.stdout else ""
-        if line:
-            lines.append(line.rstrip("\n"))
-        if p.poll() is not None:
-            if p.stdout:
-                rest = p.stdout.read()
-                if rest:
-                    lines.extend([x.rstrip("\n") for x in rest.splitlines()])
-            break
-        time.sleep(0.02)
-    return p.returncode, lines
-
-
 # ----------------------------
-# Header
+# Main Application Logic
 # ----------------------------
-st.title(f"🧾 {APP_TITLE}")
-st.caption(APP_SUBTITLE)
+def main():
+    # Header
+    st.title(f"🧾 {APP_TITLE}")
+    st.caption(APP_SUBTITLE)
 
-# ----------------------------
-# Sidebar settings
-# ----------------------------
-with st.sidebar:
-    st.markdown("### Privacy / confidentiality")
-    st.markdown(
-        """
-<div class="card">
-<b>No deployment needed.</b> This is meant to run only on your computer.<br><br>
-<b>Do not deploy this app.</b><br>
-• Do NOT deploy to any server<br>
-• Do NOT use tunnels (ngrok / Cloudflare Tunnel / Streamlit Cloud)<br>
-• Uploads are saved locally to <code>private_inputs/</code><br>
-• Outputs are saved locally to <code>outputs/</code>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("---")
-    st.markdown("### Choose the Critic/Writer Model Quality and Performance")
-    preset_name = st.selectbox("Model preset", list(PRESETS.keys()), index=1)
-    preset = PRESETS[preset_name]
-
-    st.markdown("### Advanced settings")
-    image_clarity = st.slider(
-        "Image clarity (higher = sharper, slower)",
-        min_value=120,
-        max_value=320,
-        value=int(preset["image_clarity"]),
-        step=10,
-    )
-
-    deliberate_random = st.slider(
-        "Deliberate ↔ Random",
-        min_value=0.05,
-        max_value=1.00,
-        value=float(preset["deliberate_random"]),
-        step=0.05,
-        help="Lower feels more deliberate/consistent. Higher feels more random/creative.",
-    )
-
-    with st.expander("Model details (optional)"):
-        critic_model = st.text_input("Critic model", value=preset["critic_model"])
-        writer_model = st.text_input("Writer model", value=preset["writer_model"])
-        vision_model = st.text_input("Vision model", value=preset["vision_model"])
-
-    st.markdown("---")
-    local_only_confirm = st.checkbox(
-        "I confirm I will run this locally only (no deployment, no tunnels).",
-        value=False,
-    )
-
-
-# ----------------------------
-# Main workflow
-# ----------------------------
-st.markdown("## Workflow")
-
-colA, colB, colC = st.columns([1.2, 1, 1])
-
-with colA:
-    st.markdown("### 1) Upload PDF")
-    uploaded = st.file_uploader("Manuscript PDF", type=["pdf"], accept_multiple_files=False)
-    st.caption("Saved locally into `private_inputs/` (not uploaded anywhere).")
-
-with colB:
-    st.markdown("### 2) Choose category")
-    manuscript_category = st.selectbox("Manuscript category", MANUSCRIPT_CATEGORIES, index=0)
-
-    study_design = None
-    if manuscript_category == "Original Research":
-        study_design = st.selectbox("Study design (optional)", STUDY_DESIGNS, index=0)
-
-with colC:
-    st.markdown("### 3) Start review")
-    st.caption("Runs locally using your local models (Ollama + GPU where configured).")
-    run_btn = st.button(
-        "Start review",
-        type="primary",
-        use_container_width=True,
-        disabled=(uploaded is None or not local_only_confirm),
-    )
-    if uploaded is None:
-        st.caption("Upload a PDF to enable Start review.")
-    elif not local_only_confirm:
-        st.caption("Confirm local-only use in the sidebar to enable Start review.")
-
-st.markdown("---")
-
-# ----------------------------
-# Run pipeline ONLY on button click
-# ----------------------------
-if run_btn:
-    # Save upload to private_inputs/
-    original_name = _safe_filename(uploaded.name)
-    tmp = PRIVATE_INPUTS / f"{_now_stamp()}__{original_name}"
-    with open(tmp, "wb") as f:
-        f.write(uploaded.getbuffer())
-
-    file_hash = _sha256_file(tmp)
-    pdf_path = PRIVATE_INPUTS / f"{tmp.stem}__{file_hash}.pdf"
-    tmp.rename(pdf_path)
-
-    # Unique output folder per run
-    run_id = f"{_now_stamp()}__{pdf_path.stem[:48]}"
-    output_dir = OUTPUTS_ROOT / run_id
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Build command (NO probing / NO --help calls)
-    cmd = build_cli_command(
-        pdf_path=pdf_path,
-        output_dir=output_dir,
-        manuscript_category=manuscript_category,
-        study_design=study_design,
-        critic_model=critic_model,
-        writer_model=writer_model,
-        vision_model=vision_model,
-        image_clarity=image_clarity,
-        deliberate_random=deliberate_random,
-    )
-
-    st.markdown("### Running locally")
-    st.markdown(
-        f"""
-<div class="card">
-<b>Input:</b> <code>{pdf_path.relative_to(REPO_ROOT)}</code><br>
-<b>Output folder:</b> <code>{output_dir.relative_to(REPO_ROOT)}</code><br>
-<b>What’s happening:</b> Critic finds issues/questions, Writer produces a structured peer review,
-and Vision is used if your CLI supports image-based figure/table analysis.
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-    with st.expander("Technical details (command)"):
-        st.code(" ".join(cmd), language="bash")
-
-    st.markdown("### Live log")
-    log_box = st.empty()
-
-    start = time.time()
-    try:
-        # Stream live output
-        # We’ll show the last ~300 lines to keep the UI snappy.
-        rc = 0
-        collected: List[str] = []
-
-        p = subprocess.Popen(
-            cmd,
-            cwd=str(REPO_ROOT),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True,
+    # Sidebar settings
+    with st.sidebar:
+        st.markdown("### Privacy / confidentiality")
+        st.markdown(
+            """
+            <div class="card">
+            <b>No deployment needed.</b> This is meant to run only on your computer.<br><br>
+            <b>Do not deploy this app.</b><br>
+            • Do NOT deploy to any server<br>
+            • Do NOT use tunnels (ngrok / Cloudflare Tunnel / Streamlit Cloud)<br>
+            • Uploads are saved locally to <code>private_inputs/</code><br>
+            • Outputs are saved locally to <code>outputs/</code>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        while True:
-            line = p.stdout.readline() if p.stdout else ""
-            if line:
-                collected.append(line.rstrip("\n"))
-                log_box.code("\n".join(collected[-300:]), language="text")
-            if p.poll() is not None:
-                if p.stdout:
-                    rest = p.stdout.read()
-                    if rest:
-                        for l in rest.splitlines():
-                            collected.append(l.rstrip("\n"))
-                rc = p.returncode
-                break
-            time.sleep(0.02)
+        st.markdown("---")
+        st.markdown("### Choose the Critic/Writer Model Quality and Performance")
+        preset_name = st.selectbox("Model preset", list(PRESETS.keys()), index=1)
+        preset = PRESETS[preset_name]
 
-    except Exception as e:
-        st.error(f"Could not start the review process: {e}")
-        st.stop()
+        st.markdown("### Advanced settings")
+        image_clarity = st.slider(
+            "Image clarity (higher = sharper, slower)",
+            min_value=120, max_value=320, value=int(preset["image_clarity"]), step=10,
+        )
 
-    elapsed = time.time() - start
+        deliberate_random = st.slider(
+            "Deliberate ↔ Random",
+            min_value=0.05, max_value=1.00, value=float(preset["deliberate_random"]), step=0.05,
+            help="Lower feels more deliberate/consistent. Higher feels more random/creative.",
+        )
 
-    # Save log
-    run_log = output_dir / "run_log.txt"
-    run_log.write_text("\n".join(collected), encoding="utf-8")
+        with st.expander("Model details (optional)"):
+            critic_model = st.text_input("Critic model", value=preset["critic_model"])
+            writer_model = st.text_input("Writer model", value=preset["writer_model"])
+            vision_model = st.text_input("Vision model", value=preset["vision_model"])
+
+        st.markdown("---")
+        local_only_confirm = st.checkbox(
+            "I confirm I will run this locally only (no deployment, no tunnels).",
+            value=False,
+        )
+
+    # Main workflow
+    st.markdown("## Workflow")
+    colA, colB, colC = st.columns([1.2, 1, 1])
+
+    with colA:
+        st.markdown("### 1) Upload PDF")
+        uploaded = st.file_uploader("Manuscript PDF", type=["pdf"], accept_multiple_files=False)
+        st.caption("Saved locally into `private_inputs/` (not uploaded anywhere).")
+
+    with colB:
+        st.markdown("### 2) Choose category")
+        manuscript_category = st.selectbox("Manuscript category", MANUSCRIPT_CATEGORIES, index=0)
+        study_design = None
+        if manuscript_category == "Original Research":
+            study_design = st.selectbox("Study design (optional)", STUDY_DESIGNS, index=0)
+
+    with colC:
+        st.markdown("### 3) Start review")
+        st.caption("Runs locally using your local models (Ollama + GPU where configured).")
+        run_btn = st.button(
+            "Start review",
+            type="primary",
+            use_container_width=True,
+            disabled=(uploaded is None or not local_only_confirm),
+        )
+        if uploaded is None:
+            st.caption("Upload a PDF to enable Start review.")
+        elif not local_only_confirm:
+            st.caption("Confirm local-only use in the sidebar to enable Start review.")
 
     st.markdown("---")
-    if
+
+    # Run pipeline
+    if run_btn:
+        # Save upload
+        original_name = _safe_filename(uploaded.name)
+        tmp = PRIVATE_INPUTS / f"{_now_stamp()}__{original_name}"
+        with open(tmp, "wb") as f:
+            f.write(uploaded.getbuffer())
+
+        file_hash = _sha256_file(tmp)
+        pdf_path = PRIVATE_INPUTS / f"{tmp.stem}__{file_hash}.pdf"
+        tmp.rename(pdf_path)
+
+        # Unique output folder
+        run_id = f"{_now_stamp()}__{pdf_path.stem[:48]}"
+        output_dir = OUTPUTS_ROOT / run_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        cmd = build_cli_command(
+            pdf_path=pdf_path,
+            output_dir=output_dir,
+            manuscript_category=manuscript_category,
+            study_design=study_design,
+            critic_model=critic_model,
+            writer_model=writer_model,
+            vision_model=vision_model,
+            image_clarity=image_clarity,
+            deliberate_random=deliberate_random,
+        )
+
+        st.markdown("### Running locally")
+        st.markdown(
+            f"""
+            <div class="card">
+            <b>Input:</b> <code>{pdf_path.relative_to(REPO_ROOT)}</code><br>
+            <b>Output folder:</b> <code>{output_dir.relative_to(REPO_ROOT)}</code><br>
+            <b>Process:</b> Critic (Issues) → Writer (Peer Review) → Vision (Figures)
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.expander("Technical details (command)"):
+            st.code(" ".join(cmd), language="bash")
+
+        st.markdown("### Live log")
+        log_box = st.empty()
+
+        start = time.time()
+        collected: List[str] = []
+        
+        try:
+            p = subprocess.Popen(
+                cmd,
+                cwd=str(REPO_ROOT),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+            )
+
+            while True:
+                line = p.stdout.readline() if p.stdout else ""
+                if line:
+                    collected.append(line.rstrip("\n"))
+                    log_box.code("\n".join(collected[-300:]), language="text")
+                if p.poll() is not None:
+                    if p.stdout:
+                        rest = p.stdout.read()
+                        if rest:
+                            for l in rest.splitlines():
+                                collected.append(l.rstrip("\n"))
+                    break
+                time.sleep(0.02)
+
+        except Exception as e:
+            st.error(f"Could not start the review process: {e}")
+            st.stop()
+
+        elapsed = time.time() - start
+        
+        # Save log
+        run_log = output_dir / "run_log.txt"
+        run_log.write_text("\n".join(collected), encoding="utf-8")
+
+        st.success(f"Review complete! (took {elapsed:.1f}s)")
+        
+        # DISPLAY OUTPUTS (Recovered Logic)
+        st.markdown("### Generated Reviews & Reports")
+        files = list_output_files(output_dir)
+        if not files:
+            st.warning("No output files were generated. Check the log for errors.")
+        else:
+            for p in files:
+                # Read file for download button
+                with open(p, "rb") as f:
+                    file_data = f.read()
+                    
+                col_icon, col_details, col_btn = st.columns([0.5, 3, 1])
+                with col_icon:
+                    st.write("📄")
+                with col_details:
+                    st.markdown(f"**{p.name}**")
+                    st.caption(f"{human_bytes(p.stat().st_size)}")
+                with col_btn:
+                    st.download_button(
+                        label="Download",
+                        data=file_data,
+                        file_name=p.name,
+                        mime="application/octet-stream",
+                        key=f"dl_{p.name}"
+                    )
+        st.markdown("---")
+
+if __name__ == "__main__":
+    main()
