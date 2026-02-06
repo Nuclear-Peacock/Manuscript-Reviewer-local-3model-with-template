@@ -9,19 +9,13 @@ import webbrowser
 from pathlib import Path
 
 # --- Configuration ---
-# We ONLY auto-download the "Medium" set to save time/disk space.
 REQUIRED_MODELS = [
-    # Vision (Shared by all)
-    "qwen2.5-vl:7b",
+    # Vision (FIXED: removed the dash)
+    "qwen2.5vl:7b",
     
     # Medium Set (The Default)
     "deepseek-r1:32b",
     "llama3.3",
-    
-    # OPTIONAL: Uncomment these if you want to force-download them too.
-    # "deepseek-r1:14b", # Fast Critic
-    # "llama3.1:8b",     # Fast Writer
-    # "deepseek-r1:70b"  # Accurate Critic
 ]
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -37,9 +31,6 @@ def is_ollama_running():
         return False
 
 def wait_for_ollama_seamlessly():
-    """
-    Opens the download page once, then polls silently until Ollama appears.
-    """
     if is_ollama_running():
         return
 
@@ -54,12 +45,11 @@ def wait_for_ollama_seamlessly():
     print(" 3. This script will resume AUTOMATICALLY once it connects.")
     print("="*50 + "\n")
 
-    # Seamless Loop: Check every 3 seconds
     while not is_ollama_running():
         time.sleep(3)
         print(".", end="", flush=True)
     
-    print("") # Newline
+    print("") 
     log("✅ Ollama detected! Resuming...")
 
 def check_and_pull_models():
@@ -73,14 +63,16 @@ def check_and_pull_models():
         return
 
     for model in REQUIRED_MODELS:
+        # Check if the specific model tag exists
         found = any(model in tag for tag in installed_tags)
+        
         if not found:
             log(f"Model '{model}' is missing. Pulling now (this may take a while)...")
             try:
                 subprocess.run(["ollama", "pull", model], check=True)
                 log(f"Successfully pulled {model}.")
             except subprocess.CalledProcessError:
-                log(f"FAILED to pull {model}. Check your internet connection.")
+                log(f"FAILED to pull {model}. Check your internet connection or model name.")
         else:
             log(f"Model '{model}' is ready.")
 
