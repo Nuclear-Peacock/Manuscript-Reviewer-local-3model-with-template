@@ -54,7 +54,7 @@ If the browser does not open, open Chrome/Edge and go to that address.
 
 1. **Upload your manuscript PDF** (drag-and-drop is fine).
 2. Choose **Medium quality, Medium speed** (recommended).
-3. Choose the **manuscript category** (and study design if it is original research).
+3. Choose the **manuscript category** (Original Research, Review Article, or Other). If you choose Original Research, you can optionally select a study design.
 4. Click **Start review**.
 5. Download your report from **Results**.
 
@@ -100,4 +100,3 @@ Your results are saved locally to `outputs/` and are also available as download 
 
 ```bat
 run_ui.bat
-
