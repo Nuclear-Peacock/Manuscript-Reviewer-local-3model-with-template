@@ -1,0 +1,5 @@
+preset_default: "Balanced (recommended)"
+show_live_log_default: false
+fig_dpi_default: 200
+fig_max_pages_default: 12
+fig_fallback_default: "first_last"
