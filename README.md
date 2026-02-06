@@ -2,15 +2,19 @@ Local Manuscript Reviewer (Radiology / Nuclear Medicine / Medical Education / AI
 
 A local-only manuscript review assistant that helps you generate a structured, human-style peer review.
 
-✅ Runs on your computer (localhost)
+✅ Runs on your computer (localhost only)
+
 ✅ Manuscripts stay on your PC
+
 ✅ Designed for radiology, nuclear medicine, medical education, and AI-in-radiology/education
 
 ⚠️ Privacy / confidentiality (please read)
 
 No deployment needed. This tool is meant to run only on your computer.
 
-Do NOT deploy this app to any server.
+Do not deploy this app.
+
+Do NOT deploy to any server.
 
 Do NOT use tunnels (ngrok / Cloudflare Tunnel / Streamlit Cloud).
 
@@ -20,7 +24,7 @@ Outputs are saved in outputs/ on your PC.
 
 If you are reviewing unpublished work, keeping this local helps protect confidentiality.
 
-Windows (One-Click UI Quickstart)
+Windows (One-click UI Quickstart)
 
 What you need (one time)
 
@@ -46,7 +50,7 @@ Your browser should open automatically at:
 
 http://127.0.0.1:8501
 
-If the browser does not open, manually open Chrome/Edge and go to that address.
+If the browser does not open, open Chrome/Edge and go to that address.
 
 Stop the UI
 
@@ -54,13 +58,11 @@ Close the browser tab.
 
 Go to the black terminal window and press Ctrl+C.
 
-Using the UI (simple)
+Using the UI
 
 Upload your manuscript PDF (drag-and-drop is fine).
 
-Choose:
-
-Medium quality, Medium speed (recommended)
+Choose Medium quality, Medium speed (recommended).
 
 Choose the manuscript category (and study design if it is original research).
 
@@ -72,7 +74,7 @@ What you get (outputs)
 
 Your results are saved locally to outputs/ and are also available as download buttons in the UI.
 
-Common files:
+Common files
 
 *_review.md — the main structured review
 
@@ -82,11 +84,11 @@ figure_notes.txt — figure/table notes (vision model)
 
 reporting_checklist_gaps.json — reporting checklist gaps (if produced)
 
-Uploads are stored in:
+Uploads are stored in
 
 private_inputs/
 
-Troubleshooting (common)
+Troubleshooting
 
 “Ollama not reachable”
 
@@ -102,11 +104,11 @@ The UI loads but the review does not start
 
 First run can be slow while models warm up.
 
-Wait ~30–60 seconds and try again.
+Wait 30–60 seconds and try again.
 
 I double-click run_ui.bat and nothing happens
 
-Right-click run_ui.bat → Run as administrator (rare)
+Right-click run_ui.bat → Run as administrator (rare).
 
 Or open Command Prompt in the repo folder and run:
 
@@ -122,7 +124,7 @@ Medium quality, Medium speed — recommended balance
 
 Low quality, High speed — fastest quick pass
 
-The app uses multiple local models:
+Models used (local):
 
 Critic: DeepSeek-R1
 
