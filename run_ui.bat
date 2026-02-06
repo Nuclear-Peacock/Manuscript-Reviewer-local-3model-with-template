@@ -1,271 +1,162 @@
-import re
-import subprocess
-from datetime import datetime
-from pathlib import Path
+@echo off
+setlocal
+cd /d "%~dp0"
 
-import streamlit as st
+REM Non-interactive modes:
+REM   setup_models.bat recommended
+REM   setup_models.bat best
+REM   setup_models.bat fast
+REM   setup_models.bat all
+REM   setup_models.bat list
 
-REPO_ROOT = Path(__file__).resolve().parent
-PRIVATE_DIR = REPO_ROOT / "private_inputs"
-OUTPUTS_DIR = REPO_ROOT / "outputs"
+if /I "%~1"=="recommended" goto RECOMMENDED
+if /I "%~1"=="best" goto BEST
+if /I "%~1"=="fast" goto FAST
+if /I "%~1"=="all" goto ALL
+if /I "%~1"=="list" goto LIST
 
-DEFAULT_RUBRIC = "config/rubrics/core_rubric.json"
-
-MODEL_PRESETS = {
-    "Best (Max quality; very large models)": {
-        "critic": "deepseek-r1:70b",
-        "writer": "llama3.3:70b",
-        "vlm": "qwen2.5vl:7b",
-        "num_ctx": 16384,
-    },
-    "Balanced (Recommended; great quality/faster)": {
-        "critic": "deepseek-r1:32b",
-        "writer": "llama3.3:70b",
-        "vlm": "qwen2.5vl:7b",
-        "num_ctx": 12288,
-    },
-    "Fast (Smaller; widest compatibility)": {
-        "critic": "deepseek-r1:14b",
-        "writer": "llama3.1:8b",
-        "vlm": "qwen2.5vl:7b",
-        "num_ctx": 8192,
-    },
-}
-
-MANUSCRIPT_TYPES = [
-    "original_research",
-    "education",
-    "ai",
-    "systematic_review",
-    "other",
-]
-
-STUDY_DESIGNS = [
-    "diagnostic_accuracy",
-    "prediction_model",
-    "interventional",
-    "educational_intervention",
-    "systematic_review",
-    "other",
-]
+goto MENU
 
 
-def safe_filename(name: str) -> str:
-    name = name.strip()
-    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
-    return name[:120] if len(name) > 120 else name
+:MENU
+cls
+echo ==========================================================
+echo   Model Setup - Local Manuscript Reviewer (Ollama)
+echo ==========================================================
+echo.
+echo Safe to re-run. Installs only missing models.
+echo.
+echo  1) Recommended (Balanced)
+echo     - deepseek-r1:32b
+echo     - llama3.3:70b
+echo     - qwen2.5vl:7b
+echo.
+echo  2) Best Quality (Very large)
+echo     - deepseek-r1:70b
+echo     - llama3.3:70b
+echo     - qwen2.5vl:7b
+echo.
+echo  3) Fast (Smaller / most compatible)
+echo     - deepseek-r1:14b
+echo     - llama3.1:8b
+echo     - qwen2.5vl:7b
+echo.
+echo  4) Install Everything (Largest)
+echo.
+echo  5) Show installed models
+echo  6) Exit
+echo.
+
+call :CHECK_OLLAMA
+if errorlevel 1 (
+  pause
+  exit /b 1
+)
+
+set /p CHOICE=Select an option (1-6): 
+
+if "%CHOICE%"=="1" goto RECOMMENDED
+if "%CHOICE%"=="2" goto BEST
+if "%CHOICE%"=="3" goto FAST
+if "%CHOICE%"=="4" goto ALL
+if "%CHOICE%"=="5" goto LIST
+if "%CHOICE%"=="6" goto END
+
+echo.
+echo Invalid choice.
+pause
+goto MENU
 
 
-def save_upload_to_private(uploaded_file) -> Path:
-    PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
-    original = safe_filename(uploaded_file.name)
-    dest = PRIVATE_DIR / original
-    if dest.exists():
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        dest = PRIVATE_DIR / f"{dest.stem}_{stamp}{dest.suffix}"
-    dest.write_bytes(uploaded_file.getbuffer())
-    return dest
+:RECOMMENDED
+set MODELS=deepseek-r1:32b llama3.3:70b qwen2.5vl:7b
+goto INSTALL
+
+:BEST
+set MODELS=deepseek-r1:70b llama3.3:70b qwen2.5vl:7b
+goto INSTALL
+
+:FAST
+set MODELS=deepseek-r1:14b llama3.1:8b qwen2.5vl:7b
+goto INSTALL
+
+:ALL
+set MODELS=deepseek-r1:70b deepseek-r1:32b deepseek-r1:14b llama3.3:70b llama3.1:8b qwen2.5vl:7b
+goto INSTALL
 
 
-def read_if_exists(p: Path) -> str:
-    return p.read_text(encoding="utf-8", errors="ignore") if p.exists() else ""
+:LIST
+call :CHECK_OLLAMA
+if errorlevel 1 (
+  if "%~1"=="" pause
+  exit /b 1
+)
+echo.
+echo Installed models:
+echo.
+ollama list
+echo.
+if "%~1"=="" pause
+exit /b 0
 
 
-def run_cli(
-    pdf_path: Path,
-    out_md: Path,
-    preset: dict,
-    manuscript_type: str,
-    study_design: str,
-    has_ai: bool,
-    fig_dpi: int,
-    fig_max_pages: int,
-    fig_fallback: str,
-    temperature: float,
-    rubric_path: str = DEFAULT_RUBRIC,
-) -> int:
-    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+:INSTALL
+call :CHECK_OLLAMA
+if errorlevel 1 (
+  if "%~1"=="" pause
+  exit /b 1
+)
 
-    cmd = [
-        "python",
-        "-m",
-        "reviewer.cli",
-        "--input",
-        str(pdf_path),
-        "--out",
-        str(out_md),
-        "--rubric",
-        rubric_path,
-        "--manuscript_type",
-        manuscript_type,
-        "--study_design",
-        study_design,
-        "--critic_model",
-        preset["critic"],
-        "--writer_model",
-        preset["writer"],
-        "--vlm_model",
-        preset["vlm"],
-        "--num_ctx",
-        str(preset["num_ctx"]),
-        "--temperature",
-        str(temperature),
-        "--fig_dpi",
-        str(fig_dpi),
-        "--fig_max_pages",
-        str(fig_max_pages),
-        "--fig_fallback",
-        fig_fallback,
-    ]
-    if has_ai:
-        cmd.append("--has_ai")
+echo.
+echo Installing (only missing):
+for %%M in (%MODELS%) do (
+  call :ENSURE_MODEL "%%M"
+  if errorlevel 1 (
+    if "%~1"=="" pause
+    exit /b 1
+  )
+)
 
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(REPO_ROOT),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        universal_newlines=True,
-    )
-
-    log_lines = []
-    placeholder = st.empty()
-
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        log_lines.append(line.rstrip("\n"))
-        placeholder.code("\n".join(log_lines[-220:]), language="text")
-
-    return proc.wait()
+echo.
+echo DONE. Models installed.
+echo You can run: run_ui.bat
+echo.
+if "%~1"=="" (
+  pause
+  goto MENU
+)
+exit /b 0
 
 
-st.set_page_config(page_title="Local Manuscript Reviewer", layout="wide")
-st.title("Local Manuscript Reviewer")
-st.caption("Runs locally on your computer. Uploads saved to private_inputs/. Outputs saved to outputs/.")
+:ENSURE_MODEL
+set "MODEL=%~1"
+ollama list | findstr /i /r "^%MODEL%[ ]" >nul 2>&1
+if errorlevel 1 (
+  echo PULL  %MODEL%
+  ollama pull %MODEL%
+  if errorlevel 1 (
+    echo.
+    echo ERROR: Failed to pull %MODEL%
+    exit /b 1
+  )
+) else (
+  echo OK    %MODEL%
+)
+exit /b 0
 
-left, right = st.columns([1, 1], gap="large")
 
-with left:
-    st.subheader("1) Upload manuscript PDF")
-    uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"])
+:CHECK_OLLAMA
+curl -s http://localhost:11434/api/tags >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo ERROR: Ollama not reachable at http://localhost:11434
+  echo Start Ollama, then re-run.
+  echo.
+  exit /b 1
+)
+exit /b 0
 
-    st.subheader("2) Review settings")
-    preset_label = st.selectbox("Quality preset", list(MODEL_PRESETS.keys()), index=1)
-    preset = MODEL_PRESETS[preset_label]
 
-    manuscript_type = st.selectbox("Manuscript type", MANUSCRIPT_TYPES, index=0)
-    study_design = st.selectbox("Study design", STUDY_DESIGNS, index=0)
-    has_ai = st.checkbox("AI-related manuscript", value=True)
+:END
+exit /b 0
 
-    st.subheader("3) Figure/table vision settings")
-    fig_dpi = st.slider("Render DPI (tables often need higher)", 150, 300, 200, 10)
-    fig_max_pages = st.slider("Max PDF pages to render for vision model", 2, 40, 12, 1)
-    fig_fallback = st.selectbox(
-        "If no embedded images are detected (vector figures), render:",
-        ["first_last", "all", "none"],
-        index=0,
-        help="Some PDFs store figures as vector graphics. This controls fallback rendering.",
-    )
-
-    st.subheader("4) Output style")
-    temperature = st.slider("Temperature (lower = more consistent)", 0.0, 0.6, 0.2, 0.05)
-
-    st.divider()
-    run_btn = st.button("Run review", type="primary", use_container_width=True)
-
-with right:
-    st.subheader("Run log")
-    st.info("Progress will appear here (critic → figures → writer).")
-
-    if run_btn:
-        if not uploaded_pdf:
-            st.error("Please upload a PDF first.")
-            st.stop()
-
-        pdf_path = save_upload_to_private(uploaded_pdf)
-        OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-
-        out_md = OUTPUTS_DIR / f"{pdf_path.stem}_review.md"
-        critic_log = OUTPUTS_DIR / "critic_issue_log.md"
-        figure_notes = OUTPUTS_DIR / "figure_notes.txt"
-
-        st.write(f"Saved manuscript to: `{pdf_path}`")
-        st.write(f"Output review will be: `{out_md}`")
-
-        rc = run_cli(
-            pdf_path=pdf_path,
-            out_md=out_md,
-            preset=preset,
-            manuscript_type=manuscript_type,
-            study_design=study_design,
-            has_ai=has_ai,
-            fig_dpi=fig_dpi,
-            fig_max_pages=fig_max_pages,
-            fig_fallback=fig_fallback,
-            temperature=temperature,
-        )
-
-        if rc == 0:
-            st.success("Review complete.")
-        else:
-            st.error(f"Review process exited with code {rc}.")
-
-        st.divider()
-        st.subheader("Outputs")
-
-        review_text = read_if_exists(out_md)
-        critic_text = read_if_exists(critic_log)
-        fig_text = read_if_exists(figure_notes)
-
-        tab1, tab2, tab3 = st.tabs(["Review (MD)", "Critic log", "Figure notes"])
-
-        with tab1:
-            if review_text:
-                st.download_button(
-                    "Download review.md",
-                    data=review_text,
-                    file_name=out_md.name,
-                    mime="text/markdown",
-                    use_container_width=True,
-                )
-                st.text_area("Preview", review_text, height=450)
-            else:
-                st.info("No review output found yet.")
-
-        with tab2:
-            if critic_text:
-                st.download_button(
-                    "Download critic_issue_log.md",
-                    data=critic_text,
-                    file_name=critic_log.name,
-                    mime="text/markdown",
-                    use_container_width=True,
-                )
-                st.text_area("Preview", critic_text, height=450)
-            else:
-                st.info("No critic log found yet.")
-
-        with tab3:
-            if fig_text:
-                st.download_button(
-                    "Download figure_notes.txt",
-                    data=fig_text,
-                    file_name=figure_notes.name,
-                    mime="text/plain",
-                    use_container_width=True,
-                )
-                st.text_area("Preview", fig_text, height=450)
-            else:
-                st.info("No figure notes found yet.")
-
-st.divider()
-st.subheader("Previously uploaded manuscripts (private_inputs/)")
-PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
-pdfs = sorted(PRIVATE_DIR.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
-if not pdfs:
-    st.caption("No PDFs found yet.")
-else:
-    for p in pdfs[:30]:
-        st.caption(f"- {p.name}")
