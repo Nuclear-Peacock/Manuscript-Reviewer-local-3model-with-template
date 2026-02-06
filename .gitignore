@@ -17,3 +17,4 @@ cache/
 
 # Real manuscripts should go here (never commit)
 private_inputs/
+outputs/
