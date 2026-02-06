@@ -257,119 +257,142 @@ def main():
 
     st.markdown("---")
 
-    # Run pipeline
-    if run_btn:
-        # Save upload
-        original_name = _safe_filename(uploaded.name)
-        tmp = PRIVATE_INPUTS / f"{_now_stamp()}__{original_name}"
-        with open(tmp, "wb") as f:
-            f.write(uploaded.getbuffer())
+# ----------------------------
+# Run pipeline ONLY on button click
+# ----------------------------
+if run_btn:
+    # 1. Setup Files
+    original_name = _safe_filename(uploaded.name)
+    tmp = PRIVATE_INPUTS / f"{_now_stamp()}__{original_name}"
+    with open(tmp, "wb") as f:
+        f.write(uploaded.getbuffer())
 
-        file_hash = _sha256_file(tmp)
-        pdf_path = PRIVATE_INPUTS / f"{tmp.stem}__{file_hash}.pdf"
-        tmp.rename(pdf_path)
+    file_hash = _sha256_file(tmp)
+    pdf_path = PRIVATE_INPUTS / f"{tmp.stem}__{file_hash}.pdf"
+    tmp.rename(pdf_path)
 
-        # Unique output folder
-        run_id = f"{_now_stamp()}__{pdf_path.stem[:48]}"
-        output_dir = OUTPUTS_ROOT / run_id
-        output_dir.mkdir(parents=True, exist_ok=True)
+    # Unique output folder per run
+    run_id = f"{_now_stamp()}__{pdf_path.stem[:48]}"
+    output_dir = OUTPUTS_ROOT / run_id
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-        cmd = build_cli_command(
-            pdf_path=pdf_path,
-            output_dir=output_dir,
-            manuscript_category=manuscript_category,
-            study_design=study_design,
-            critic_model=critic_model,
-            writer_model=writer_model,
-            vision_model=vision_model,
-            image_clarity=image_clarity,
-            deliberate_random=deliberate_random,
-        )
+    # Build command
+    cmd = build_cli_command(
+        pdf_path=pdf_path,
+        output_dir=output_dir,
+        manuscript_category=manuscript_category,
+        study_design=study_design,
+        critic_model=critic_model,
+        writer_model=writer_model,
+        vision_model=vision_model,
+        image_clarity=image_clarity,
+        deliberate_random=deliberate_random,
+    )
 
-        st.markdown("### Running locally")
-        st.markdown(
-            f"""
-            <div class="card">
-            <b>Input:</b> <code>{pdf_path.relative_to(REPO_ROOT)}</code><br>
-            <b>Output folder:</b> <code>{output_dir.relative_to(REPO_ROOT)}</code><br>
-            <b>Process:</b> Critic (Issues) → Writer (Peer Review) → Vision (Figures)
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        with st.expander("Technical details (command)"):
-            st.code(" ".join(cmd), language="bash")
-
-        st.markdown("### Live log")
+    st.markdown("### Review Progress")
+    
+    # 2. UI Elements for Progress
+    # We use a progress bar and a status text that updates dynamically
+    prog_bar = st.progress(0, text="Initializing reviewer...")
+    
+    # We keep the logs, but hide them in an expander
+    with st.expander("See raw technical logs (for debugging)", expanded=False):
         log_box = st.empty()
 
-        start = time.time()
-        collected: List[str] = []
-        
-        try:
-            p = subprocess.Popen(
-                cmd,
-                cwd=str(REPO_ROOT),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-            )
+    start = time.time()
+    collected: List[str] = []
+    
+    try:
+        p = subprocess.Popen(
+            cmd,
+            cwd=str(REPO_ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
+        )
 
-            while True:
-                line = p.stdout.readline() if p.stdout else ""
-                if line:
-                    collected.append(line.rstrip("\n"))
-                    log_box.code("\n".join(collected[-300:]), language="text")
-                if p.poll() is not None:
-                    if p.stdout:
-                        rest = p.stdout.read()
-                        if rest:
-                            for l in rest.splitlines():
-                                collected.append(l.rstrip("\n"))
-                    break
-                time.sleep(0.02)
-
-        except Exception as e:
-            st.error(f"Could not start the review process: {e}")
-            st.stop()
-
-        elapsed = time.time() - start
-        
-        # Save log
-        run_log = output_dir / "run_log.txt"
-        run_log.write_text("\n".join(collected), encoding="utf-8")
-
-        st.success(f"Review complete! (took {elapsed:.1f}s)")
-        
-        # DISPLAY OUTPUTS (Recovered Logic)
-        st.markdown("### Generated Reviews & Reports")
-        files = list_output_files(output_dir)
-        if not files:
-            st.warning("No output files were generated. Check the log for errors.")
-        else:
-            for p in files:
-                # Read file for download button
-                with open(p, "rb") as f:
-                    file_data = f.read()
+        # 3. The "Read & Update" Loop
+        while True:
+            line = p.stdout.readline() if p.stdout else ""
+            if line:
+                text_line = line.strip()
+                collected.append(text_line)
+                
+                # --- PROGRESS HEURISTICS ---
+                # We scan the line for keywords to update the bar
+                lower_line = text_line.lower()
+                
+                if "loading weights" in lower_line or "bertmodel" in lower_line:
+                    prog_bar.progress(10, text="⏳ Loading AI models (this may take a moment)...")
+                
+                elif "critic" in lower_line and "start" in lower_line:
+                    prog_bar.progress(30, text="🧐 Critic Agent: Reading and analyzing manuscript...")
+                
+                elif "writer" in lower_line and "start" in lower_line:
+                    prog_bar.progress(60, text="✍️ Writer Agent: Drafting peer review report...")
                     
-                col_icon, col_details, col_btn = st.columns([0.5, 3, 1])
-                with col_icon:
-                    st.write("📄")
-                with col_details:
-                    st.markdown(f"**{p.name}**")
-                    st.caption(f"{human_bytes(p.stat().st_size)}")
-                with col_btn:
-                    st.download_button(
-                        label="Download",
-                        data=file_data,
-                        file_name=p.name,
-                        mime="application/octet-stream",
-                        key=f"dl_{p.name}"
-                    )
-        st.markdown("---")
+                elif "vision" in lower_line or "figure" in lower_line:
+                    prog_bar.progress(80, text="🖼️ Vision Agent: Checking figures and tables...")
+                    
+                elif "saving" in lower_line or "completed" in lower_line:
+                    prog_bar.progress(95, text="💾 Finalizing and saving reports...")
+
+                # Update the hidden log box every time (so it's current if opened)
+                # We only show the last 50 lines to keep the browser fast
+                log_box.code("\n".join(collected[-50:]), language="text")
+
+            if p.poll() is not None:
+                # Read any remaining output after process closes
+                if p.stdout:
+                    rest = p.stdout.read()
+                    if rest:
+                        for l in rest.splitlines():
+                            collected.append(l.strip())
+                break
+            
+            # Tiny sleep to prevent CPU spiking
+            time.sleep(0.01)
+
+    except Exception as e:
+        st.error(f"Could not start the review process: {e}")
+        st.stop()
+
+    elapsed = time.time() - start
+    
+    # 4. Finish
+    prog_bar.progress(100, text=f"✅ Complete! (took {elapsed:.1f}s)")
+
+    # Save full log to file
+    run_log = output_dir / "run_log.txt"
+    run_log.write_text("\n".join(collected), encoding="utf-8")
+    
+    # 5. Display Outputs
+    st.markdown("### Generated Reviews & Reports")
+    files = list_output_files(output_dir)
+    if not files:
+        st.warning("No output files were generated. Check the hidden log above for errors.")
+    else:
+        for p in files:
+            with open(p, "rb") as f:
+                file_data = f.read()
+                
+            col_icon, col_details, col_btn = st.columns([0.5, 3, 1])
+            with col_icon:
+                st.write("📄")
+            with col_details:
+                st.markdown(f"**{p.name}**")
+                st.caption(f"{human_bytes(p.stat().st_size)}")
+            with col_btn:
+                st.download_button(
+                    label="Download",
+                    data=file_data,
+                    file_name=p.name,
+                    mime="application/octet-stream",
+                    key=f"dl_{p.name}"
+                )
+    st.markdown("---")
 
 if __name__ == "__main__":
     main()
