@@ -11,22 +11,22 @@ if %errorlevel% neq 0 (
     echo  ERROR: Python is not installed (or not in your PATH)
     echo ========================================================
     echo.
-    echo  This tool requires Python to run.
-    echo  I am opening the download page for you now.
+    echo  1. I am opening the Python download page for you.
+    echo  2. Download and run the "Windows Installer".
+    echo  3. CRITICAL: Check the box "Add Python.exe to PATH"!
     echo.
-    echo  INSTRUCTIONS:
-    echo  1. Download the "Windows Installer".
-    echo  2. Run the installer.
-    echo  3. CRITICAL: Check the box "Add Python.exe to PATH" 
-    echo     at the bottom of the first screen!
+    echo  NOTE: Windows cannot see the new Python installation
+    echo        until you restart this launcher.
     echo.
-    timeout /t 4 >nul
+    echo  >>> PLEASE RESTART THIS FILE AFTER INSTALLATION. <<<
+    echo.
+    timeout /t 5 >nul
     start https://www.python.org/downloads/
     pause
     exit /b
 )
 
-:: 2. If Python is good, run the robust launcher
+:: 2. If Python is good, run the seamless launcher
 python launcher.py
 
 :: 3. Catch crashes
