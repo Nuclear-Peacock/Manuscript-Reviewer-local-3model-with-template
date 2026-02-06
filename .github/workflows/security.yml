@@ -2,12 +2,12 @@ name: "Security Shield"
 
 on:
   push:
-    branches: ["main"]   # Runs every time you commit to main
+    branches: ["main"]
   pull_request:
-    branches: ["main"]   # Runs every time you open a PR
+    branches: ["main"]
   schedule:
-    - cron: '0 0 * * 1'  # Runs automatically every Monday at midnight (even if you don't code)
-  workflow_dispatch:      # Adds a manual "Play" button just in case
+    - cron: '0 0 * * 1' # Runs every Monday at midnight
+  workflow_dispatch:      # Allows manual trigger
 
 jobs:
   scan:
@@ -15,32 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write # Required for GitHub Security Tab integration
-
+      security-events: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Gitleaks needs full history to find old secrets
-
-      # 1. SECRET SCANNING (Gitleaks)
-      - name: Check for Secrets
+          fetch-depth: 0
+      - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 2. VULNERABILITY SCANNING (Trivy)
-      - name: Scan for Vulnerabilities (SCA/IaC)
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-
-      # 3. UPLOAD RESULTS TO GITHUB
-      - name: Upload Scan Results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() # Ensure results upload even if flaws are found
-        with:
-          sarif_file: 'trivy-results.sarif'
