@@ -105,10 +105,11 @@ except Exception as e:
 def main():
     log("--- Local Manuscript Reviewer Launcher ---")
 
-    # 1. Check Python Dependencies
+# 1. Check Python Dependencies
     try:
         import streamlit
-        import pymupdf  # Check for the one we just added
+        import fitz  # pymupdf
+        import docx  # <--- ADD THIS LINE (this triggers the check)
     except ImportError:
         log("Installing missing requirements...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
