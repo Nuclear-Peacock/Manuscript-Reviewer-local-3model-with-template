@@ -54,15 +54,18 @@ def save_upload(uploaded_file) -> Path:
 
 
 def read_text(p: Path) -> str:
-    if p.exists():
-        return p.read_text(encoding="utf-8", errors="ignore")
-    return ""
+    return p.read_text(encoding="utf-8", errors="ignore") if p.exists() else ""
+
+
+def reviewer_cli_exists() -> bool:
+    # Avoid app crash if package structure differs
+    if (REPO_ROOT / "reviewer" / "cli.py").exists():
+        return True
+    return False
 
 
 def run_review(pdf_path: Path, out_md: Path, preset: dict, manuscript_type: str, study_design: str,
                has_ai: bool, fig_dpi: int, fig_max_pages: int, fig_fallback: str, temperature: float) -> int:
-    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-
     cmd = [
         "python", "-m", "reviewer.cli",
         "--input", str(pdf_path),
@@ -107,6 +110,13 @@ st.set_page_config(page_title="Local Manuscript Reviewer", layout="wide")
 st.title("Local Manuscript Reviewer")
 st.caption("Local-only UI. Uploads saved to private_inputs/. Outputs saved to outputs/.")
 
+if not reviewer_cli_exists():
+    st.error(
+        "The reviewer engine was not found at `reviewer/cli.py`.\n\n"
+        "This UI can open, but the pipeline cannot run until your repo contains the reviewer package.\n"
+        "If your CLI file has a different path/module name, update `app.py` to match."
+    )
+
 left, right = st.columns([1, 1], gap="large")
 
 with left:
@@ -139,6 +149,10 @@ with right:
     if run_btn:
         if not uploaded_pdf:
             st.error("Please upload a PDF first.")
+            st.stop()
+
+        if not reviewer_cli_exists():
+            st.error("Cannot run review: reviewer/cli.py not found in this repo.")
             st.stop()
 
         pdf_path = save_upload(uploaded_pdf)
@@ -208,3 +222,4 @@ if not pdfs:
 else:
     for p in pdfs[:30]:
         st.caption(f"- {p.name}")
+
