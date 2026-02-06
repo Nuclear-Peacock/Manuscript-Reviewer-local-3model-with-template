@@ -1,10 +1,22 @@
 @echo off
-cd /d "%~dp0"
+title Manuscript Reviewer Launcher
+echo Starting Launcher...
 
-REM Always run the PowerShell launcher (more reliable than pure .bat)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0run_ui.ps1"
+:: Check if Python is available
+python --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ERROR: Python is not installed or not in your PATH.
+    echo Please install Python 3.10+ and check "Add to PATH" during installation.
+    pause
+    exit /b
+)
 
-REM If PowerShell returns, keep this window open so you can read messages
-echo.
-echo Press any key to close...
-pause >nul
+:: Run the robust launcher
+python launcher.py
+
+:: If launcher exits abnormally, pause so user can see why
+if %errorlevel% neq 0 (
+    echo.
+    echo The app closed with an error.
+    pause
+)
