@@ -1,196 +1,271 @@
-@echo off
-setlocal
-cd /d "%~dp0"
+import re
+import subprocess
+from datetime import datetime
+from pathlib import Path
 
-echo ==========================================================
-echo   Local Manuscript Reviewer - One-Click Launcher (Windows)
-echo   Localhost only (no tunnel). Manuscripts stay on your PC.
-echo ==========================================================
-echo.
+import streamlit as st
 
-REM -------------------------
-REM 1) Check Python exists
-REM -------------------------
-python --version >nul 2>&1
-if errorlevel 1 goto PY_MISSING
+REPO_ROOT = Path(__file__).resolve().parent
+PRIVATE_DIR = REPO_ROOT / "private_inputs"
+OUTPUTS_DIR = REPO_ROOT / "outputs"
 
-REM -------------------------
-REM 2) Check Python version >= 3.10 (using Python, no batch parsing)
-REM -------------------------
-python -c "import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
-if errorlevel 1 goto PY_OLD
+DEFAULT_RUBRIC = "config/rubrics/core_rubric.json"
 
-echo [OK] Python is installed and compatible.
-echo.
+MODEL_PRESETS = {
+    "Best (Max quality; very large models)": {
+        "critic": "deepseek-r1:70b",
+        "writer": "llama3.3:70b",
+        "vlm": "qwen2.5vl:7b",
+        "num_ctx": 16384,
+    },
+    "Balanced (Recommended; great quality/faster)": {
+        "critic": "deepseek-r1:32b",
+        "writer": "llama3.3:70b",
+        "vlm": "qwen2.5vl:7b",
+        "num_ctx": 12288,
+    },
+    "Fast (Smaller; widest compatibility)": {
+        "critic": "deepseek-r1:14b",
+        "writer": "llama3.1:8b",
+        "vlm": "qwen2.5vl:7b",
+        "num_ctx": 8192,
+    },
+}
 
-REM -------------------------
-REM 3) Create venv if needed, then activate
-REM -------------------------
-if not exist ".venv\Scripts\python.exe" (
-  echo [INFO] Creating virtual environment...
-  python -m venv .venv
-  if errorlevel 1 goto VENV_FAIL
-)
+MANUSCRIPT_TYPES = [
+    "original_research",
+    "education",
+    "ai",
+    "systematic_review",
+    "other",
+]
 
-call ".venv\Scripts\activate.bat"
+STUDY_DESIGNS = [
+    "diagnostic_accuracy",
+    "prediction_model",
+    "interventional",
+    "educational_intervention",
+    "systematic_review",
+    "other",
+]
 
-REM -------------------------
-REM 4) Install dependencies (idempotent)
-REM -------------------------
-echo [INFO] Installing/updating dependencies...
-python -m pip install --upgrade pip >nul 2>&1
-pip install -r requirements.txt
-if errorlevel 1 goto PIP_FAIL
 
-pip show streamlit >nul 2>&1
-if errorlevel 1 (
-  echo [INFO] Installing Streamlit...
-  pip install streamlit
-  if errorlevel 1 goto PIP_FAIL
-)
+def safe_filename(name: str) -> str:
+    name = name.strip()
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
+    return name[:120] if len(name) > 120 else name
 
-REM -------------------------
-REM 5) Check Ollama is running
-REM -------------------------
-curl -s http://localhost:11434/api/tags >nul 2>&1
-if errorlevel 1 goto OLLAMA_DOWN
 
-echo [OK] Ollama is running.
-echo.
+def save_upload_to_private(uploaded_file) -> Path:
+    PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
+    original = safe_filename(uploaded_file.name)
+    dest = PRIVATE_DIR / original
+    if dest.exists():
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        dest = PRIVATE_DIR / f"{dest.stem}_{stamp}{dest.suffix}"
+    dest.write_bytes(uploaded_file.getbuffer())
+    return dest
 
-REM -------------------------
-REM 6) Ensure folders exist
-REM -------------------------
-if not exist "private_inputs" mkdir "private_inputs" >nul 2>&1
-if not exist "outputs" mkdir "outputs" >nul 2>&1
 
-REM -------------------------
-REM 7) Check REQUIRED models (Recommended / Balanced preset)
-REM    If missing, offer to auto-install and then continue
-REM -------------------------
-set "MISSING=0"
-echo [INFO] Checking required models for Recommended (Balanced) preset...
-call :CHECK_MODEL "deepseek-r1:32b"
-call :CHECK_MODEL "llama3.3:70b"
-call :CHECK_MODEL "qwen2.5vl:7b"
+def read_if_exists(p: Path) -> str:
+    return p.read_text(encoding="utf-8", errors="ignore") if p.exists() else ""
 
-if "%MISSING%"=="1" (
-  echo.
-  echo [ACTION] Required models for Recommended (Balanced) are missing.
-  echo         If this is your first run, this is normal.
-  echo.
-  choice /c YN /m "Install the recommended models now and continue automatically?"
-  if errorlevel 2 (
-    echo [INFO] Skipping model install. The app may fail until models are installed.
-  ) else (
-    if not exist "setup_models.bat" (
-      echo [ERROR] setup_models.bat not found in this folder.
-      pause
-      exit /b 1
+
+def run_cli(
+    pdf_path: Path,
+    out_md: Path,
+    preset: dict,
+    manuscript_type: str,
+    study_design: str,
+    has_ai: bool,
+    fig_dpi: int,
+    fig_max_pages: int,
+    fig_fallback: str,
+    temperature: float,
+    rubric_path: str = DEFAULT_RUBRIC,
+) -> int:
+    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        "python",
+        "-m",
+        "reviewer.cli",
+        "--input",
+        str(pdf_path),
+        "--out",
+        str(out_md),
+        "--rubric",
+        rubric_path,
+        "--manuscript_type",
+        manuscript_type,
+        "--study_design",
+        study_design,
+        "--critic_model",
+        preset["critic"],
+        "--writer_model",
+        preset["writer"],
+        "--vlm_model",
+        preset["vlm"],
+        "--num_ctx",
+        str(preset["num_ctx"]),
+        "--temperature",
+        str(temperature),
+        "--fig_dpi",
+        str(fig_dpi),
+        "--fig_max_pages",
+        str(fig_max_pages),
+        "--fig_fallback",
+        fig_fallback,
+    ]
+    if has_ai:
+        cmd.append("--has_ai")
+
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(REPO_ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True,
     )
 
-    REM Non-interactive mode (recommended)
-    call "setup_models.bat" recommended
-    if errorlevel 1 (
-      echo [ERROR] Model installation failed.
-      pause
-      exit /b 1
+    log_lines = []
+    placeholder = st.empty()
+
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        log_lines.append(line.rstrip("\n"))
+        placeholder.code("\n".join(log_lines[-220:]), language="text")
+
+    return proc.wait()
+
+
+st.set_page_config(page_title="Local Manuscript Reviewer", layout="wide")
+st.title("Local Manuscript Reviewer")
+st.caption("Runs locally on your computer. Uploads saved to private_inputs/. Outputs saved to outputs/.")
+
+left, right = st.columns([1, 1], gap="large")
+
+with left:
+    st.subheader("1) Upload manuscript PDF")
+    uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"])
+
+    st.subheader("2) Review settings")
+    preset_label = st.selectbox("Quality preset", list(MODEL_PRESETS.keys()), index=1)
+    preset = MODEL_PRESETS[preset_label]
+
+    manuscript_type = st.selectbox("Manuscript type", MANUSCRIPT_TYPES, index=0)
+    study_design = st.selectbox("Study design", STUDY_DESIGNS, index=0)
+    has_ai = st.checkbox("AI-related manuscript", value=True)
+
+    st.subheader("3) Figure/table vision settings")
+    fig_dpi = st.slider("Render DPI (tables often need higher)", 150, 300, 200, 10)
+    fig_max_pages = st.slider("Max PDF pages to render for vision model", 2, 40, 12, 1)
+    fig_fallback = st.selectbox(
+        "If no embedded images are detected (vector figures), render:",
+        ["first_last", "all", "none"],
+        index=0,
+        help="Some PDFs store figures as vector graphics. This controls fallback rendering.",
     )
 
-    REM Re-check after install
-    set "MISSING=0"
-    echo.
-    echo [INFO] Re-checking required models after install...
-    call :CHECK_MODEL "deepseek-r1:32b"
-    call :CHECK_MODEL "llama3.3:70b"
-    call :CHECK_MODEL "qwen2.5vl:7b"
-    if "%MISSING%"=="1" (
-      echo.
-      echo [ERROR] Some recommended models are still missing.
-      echo         Please run setup_models.bat manually and choose Option 1.
-      pause
-      exit /b 1
-    )
-  )
-)
+    st.subheader("4) Output style")
+    temperature = st.slider("Temperature (lower = more consistent)", 0.0, 0.6, 0.2, 0.05)
 
-REM -------------------------
-REM 8) OPTIONAL: Check Fast/Best extras (do not block)
-REM -------------------------
-echo.
-echo [INFO] Optional model availability (for dropdown presets):
-call :CHECK_MODEL_OPTIONAL "deepseek-r1:14b"
-call :CHECK_MODEL_OPTIONAL "llama3.1:8b"
-call :CHECK_MODEL_OPTIONAL "deepseek-r1:70b"
-echo.
+    st.divider()
+    run_btn = st.button("Run review", type="primary", use_container_width=True)
 
-REM -------------------------
-REM 9) Auto-open browser + start UI (localhost only)
-REM -------------------------
-echo [INFO] Starting UI (localhost only)...
-echo       Opening: http://127.0.0.1:8501
-start "" "http://127.0.0.1:8501"
-streamlit run app.py --server.address 127.0.0.1 --server.port 8501
-exit /b 0
+with right:
+    st.subheader("Run log")
+    st.info("Progress will appear here (critic → figures → writer).")
 
+    if run_btn:
+        if not uploaded_pdf:
+            st.error("Please upload a PDF first.")
+            st.stop()
 
-REM -------------------------
-REM Subroutine: required model check
-REM -------------------------
-:CHECK_MODEL
-ollama list | findstr /i /r "^%~1[ ]" >nul 2>&1
-if errorlevel 1 (
-  echo [MISSING] %~1
-  set "MISSING=1"
-) else (
-  echo [OK]      %~1
-)
-exit /b 0
+        pdf_path = save_upload_to_private(uploaded_pdf)
+        OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
+        out_md = OUTPUTS_DIR / f"{pdf_path.stem}_review.md"
+        critic_log = OUTPUTS_DIR / "critic_issue_log.md"
+        figure_notes = OUTPUTS_DIR / "figure_notes.txt"
 
-REM -------------------------
-REM Subroutine: optional model check (does not set MISSING)
-REM -------------------------
-:CHECK_MODEL_OPTIONAL
-ollama list | findstr /i /r "^%~1[ ]" >nul 2>&1
-if errorlevel 1 (
-  echo [OPTIONAL MISSING] %~1
-) else (
-  echo [OPTIONAL OK]      %~1
-)
-exit /b 0
+        st.write(f"Saved manuscript to: `{pdf_path}`")
+        st.write(f"Output review will be: `{out_md}`")
 
+        rc = run_cli(
+            pdf_path=pdf_path,
+            out_md=out_md,
+            preset=preset,
+            manuscript_type=manuscript_type,
+            study_design=study_design,
+            has_ai=has_ai,
+            fig_dpi=fig_dpi,
+            fig_max_pages=fig_max_pages,
+            fig_fallback=fig_fallback,
+            temperature=temperature,
+        )
 
-REM -------------------------
-REM Errors
-REM -------------------------
-:PY_MISSING
-echo [ERROR] Python not found.
-echo         Install Python 3.10+ and check "Add Python to PATH".
-echo         Then run run_ui.bat again.
-pause
-exit /b 1
+        if rc == 0:
+            st.success("Review complete.")
+        else:
+            st.error(f"Review process exited with code {rc}.")
 
-:PY_OLD
-echo [ERROR] Python is installed but older than 3.10.
-echo         Please install Python 3.10+ and run run_ui.bat again.
-pause
-exit /b 1
+        st.divider()
+        st.subheader("Outputs")
 
-:VENV_FAIL
-echo [ERROR] Failed to create the virtual environment.
-pause
-exit /b 1
+        review_text = read_if_exists(out_md)
+        critic_text = read_if_exists(critic_log)
+        fig_text = read_if_exists(figure_notes)
 
-:PIP_FAIL
-echo [ERROR] Failed to install Python dependencies.
-echo         Check internet access and try again.
-pause
-exit /b 1
+        tab1, tab2, tab3 = st.tabs(["Review (MD)", "Critic log", "Figure notes"])
 
-:OLLAMA_DOWN
-echo [ERROR] Ollama is not reachable at http://localhost:11434
-echo         Start Ollama, then run run_ui.bat again.
-pause
-exit /b 1
+        with tab1:
+            if review_text:
+                st.download_button(
+                    "Download review.md",
+                    data=review_text,
+                    file_name=out_md.name,
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+                st.text_area("Preview", review_text, height=450)
+            else:
+                st.info("No review output found yet.")
 
+        with tab2:
+            if critic_text:
+                st.download_button(
+                    "Download critic_issue_log.md",
+                    data=critic_text,
+                    file_name=critic_log.name,
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+                st.text_area("Preview", critic_text, height=450)
+            else:
+                st.info("No critic log found yet.")
+
+        with tab3:
+            if fig_text:
+                st.download_button(
+                    "Download figure_notes.txt",
+                    data=fig_text,
+                    file_name=figure_notes.name,
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+                st.text_area("Preview", fig_text, height=450)
+            else:
+                st.info("No figure notes found yet.")
+
+st.divider()
+st.subheader("Previously uploaded manuscripts (private_inputs/)")
+PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
+pdfs = sorted(PRIVATE_DIR.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
+if not pdfs:
+    st.caption("No PDFs found yet.")
+else:
+    for p in pdfs[:30]:
+        st.caption(f"- {p.name}")
