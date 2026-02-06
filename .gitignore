@@ -1,4 +1,4 @@
-# Python artifacts
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -10,24 +10,17 @@ env/
 .streamlit/secrets.toml
 .streamlit/config.toml
 
-# Local App Data (CRITICAL PRIVACY SETTINGS)
-# Never commit inputs or outputs to git
-private_inputs/
-outputs/
-*.pdf
-
-# IDE settings
-.vscode/
-.idea/
-
-# Logs
-*.log
-
-# Ignore the contents of these folders...
+# Private Data (CRITICAL)
 private_inputs/*
 outputs/*
+*.pdf
 
-# ...but keep the folders themselves (by allowing the .gitkeep file)
+# Keep the folders structure
 !private_inputs/.gitkeep
 !outputs/.gitkeep
 
+# IDE & System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
