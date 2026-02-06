@@ -46,26 +46,25 @@ PRESETS = {
     "Accurate (Slow)": {
         "critic_model": "deepseek-r1:70b",
         "writer_model": "llama3.3",
-        "vision_model": "qwen2.5-vl:7b",
+        "vision_model": "qwen2.5vl:7b",   # FIXED: Removed dash
         "image_clarity": 260,
         "deliberate_random": 0.25,
     },
     "Medium (Balanced)": {
         "critic_model": "deepseek-r1:32b",
         "writer_model": "llama3.3",
-        "vision_model": "qwen2.5-vl:7b",
+        "vision_model": "qwen2.5vl:7b",   # FIXED: Removed dash
         "image_clarity": 220,
         "deliberate_random": 0.45,
     },
     "Fast (Less Accurate)": {
         "critic_model": "deepseek-r1:14b",
         "writer_model": "llama3.1:8b",
-        "vision_model": "qwen2.5-vl:7b",
+        "vision_model": "qwen2.5vl:7b",   # FIXED: Removed dash
         "image_clarity": 180,
         "deliberate_random": 0.65,
     },
 }
-
 # ----------------------------
 # Streamlit config + minimal CSS
 # ----------------------------
