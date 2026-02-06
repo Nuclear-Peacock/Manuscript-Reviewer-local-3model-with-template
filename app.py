@@ -1,4 +1,3 @@
-import os
 import re
 import subprocess
 from datetime import datetime
@@ -13,21 +12,21 @@ OUTPUTS_DIR = REPO_ROOT / "outputs"
 DEFAULT_RUBRIC = "config/rubrics/core_rubric.json"
 
 MODEL_PRESETS = {
-    "Best (Max quality; high VRAM)": {
+    "Best (Max quality; very large models)": {
         "critic": "deepseek-r1:70b",
         "writer": "llama3.3:70b",
         "vlm": "qwen2.5vl:7b",
         "num_ctx": 16384,
     },
-    "Balanced (Great quality; faster)": {
+    "Balanced (Recommended; great quality/faster)": {
         "critic": "deepseek-r1:32b",
         "writer": "llama3.3:70b",
         "vlm": "qwen2.5vl:7b",
         "num_ctx": 12288,
     },
-    "Fast (Good quality; widest hardware)": {
+    "Fast (Smaller; widest compatibility)": {
         "critic": "deepseek-r1:14b",
-        "writer": "llama3.3:32b",
+        "writer": "llama3.1:8b",
         "vlm": "qwen2.5vl:7b",
         "num_ctx": 8192,
     },
@@ -50,21 +49,27 @@ STUDY_DESIGNS = [
     "other",
 ]
 
+
 def safe_filename(name: str) -> str:
     name = name.strip()
     name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
     return name[:120] if len(name) > 120 else name
 
+
 def save_upload_to_private(uploaded_file) -> Path:
     PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
     original = safe_filename(uploaded_file.name)
-    # avoid collisions by timestamp suffix if needed
     dest = PRIVATE_DIR / original
     if dest.exists():
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         dest = PRIVATE_DIR / f"{dest.stem}_{stamp}{dest.suffix}"
     dest.write_bytes(uploaded_file.getbuffer())
     return dest
+
+
+def read_if_exists(p: Path) -> str:
+    return p.read_text(encoding="utf-8", errors="ignore") if p.exists() else ""
+
 
 def run_cli(
     pdf_path: Path,
@@ -82,25 +87,39 @@ def run_cli(
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        "python", "-m", "reviewer.cli",
-        "--input", str(pdf_path),
-        "--out", str(out_md),
-        "--rubric", rubric_path,
-        "--manuscript_type", manuscript_type,
-        "--study_design", study_design,
-        "--critic_model", preset["critic"],
-        "--writer_model", preset["writer"],
-        "--vlm_model", preset["vlm"],
-        "--num_ctx", str(preset["num_ctx"]),
-        "--temperature", str(temperature),
-        "--fig_dpi", str(fig_dpi),
-        "--fig_max_pages", str(fig_max_pages),
-        "--fig_fallback", fig_fallback,
+        "python",
+        "-m",
+        "reviewer.cli",
+        "--input",
+        str(pdf_path),
+        "--out",
+        str(out_md),
+        "--rubric",
+        rubric_path,
+        "--manuscript_type",
+        manuscript_type,
+        "--study_design",
+        study_design,
+        "--critic_model",
+        preset["critic"],
+        "--writer_model",
+        preset["writer"],
+        "--vlm_model",
+        preset["vlm"],
+        "--num_ctx",
+        str(preset["num_ctx"]),
+        "--temperature",
+        str(temperature),
+        "--fig_dpi",
+        str(fig_dpi),
+        "--fig_max_pages",
+        str(fig_max_pages),
+        "--fig_fallback",
+        fig_fallback,
     ]
     if has_ai:
         cmd.append("--has_ai")
 
-    # Run and stream output
     proc = subprocess.Popen(
         cmd,
         cwd=str(REPO_ROOT),
@@ -113,30 +132,27 @@ def run_cli(
 
     log_lines = []
     placeholder = st.empty()
+
     assert proc.stdout is not None
     for line in proc.stdout:
         log_lines.append(line.rstrip("\n"))
-        # show last ~200 lines to keep UI responsive
-        placeholder.code("\n".join(log_lines[-200:]), language="text")
+        placeholder.code("\n".join(log_lines[-220:]), language="text")
 
     return proc.wait()
 
-def read_if_exists(p: Path) -> str:
-    return p.read_text(encoding="utf-8", errors="ignore") if p.exists() else ""
 
 st.set_page_config(page_title="Local Manuscript Reviewer", layout="wide")
-
 st.title("Local Manuscript Reviewer")
-st.caption("Runs locally on your machine. Manuscripts are stored in private_inputs/ and never uploaded anywhere.")
+st.caption("Runs locally on your computer. Uploads saved to private_inputs/. Outputs saved to outputs/.")
 
-col_left, col_right = st.columns([1, 1], gap="large")
+left, right = st.columns([1, 1], gap="large")
 
-with col_left:
+with left:
     st.subheader("1) Upload manuscript PDF")
     uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"])
 
     st.subheader("2) Review settings")
-    preset_label = st.selectbox("Quality preset", list(MODEL_PRESETS.keys()), index=0)
+    preset_label = st.selectbox("Quality preset", list(MODEL_PRESETS.keys()), index=1)
     preset = MODEL_PRESETS[preset_label]
 
     manuscript_type = st.selectbox("Manuscript type", MANUSCRIPT_TYPES, index=0)
@@ -144,31 +160,30 @@ with col_left:
     has_ai = st.checkbox("AI-related manuscript", value=True)
 
     st.subheader("3) Figure/table vision settings")
-    fig_dpi = st.slider("Render DPI (tables often need higher)", min_value=150, max_value=300, value=200, step=10)
-    fig_max_pages = st.slider("Max PDF pages to render for VLM", min_value=2, max_value=40, value=12, step=1)
+    fig_dpi = st.slider("Render DPI (tables often need higher)", 150, 300, 200, 10)
+    fig_max_pages = st.slider("Max PDF pages to render for vision model", 2, 40, 12, 1)
     fig_fallback = st.selectbox(
-        "Fallback if no embedded images detected (vector figures)",
+        "If no embedded images are detected (vector figures), render:",
         ["first_last", "all", "none"],
         index=0,
-        help="Some PDFs store figures as vector graphics. If embedded images aren't detected, choose which pages to render anyway."
+        help="Some PDFs store figures as vector graphics. This controls fallback rendering.",
     )
 
-    st.subheader("4) Generation settings")
+    st.subheader("4) Output style")
     temperature = st.slider("Temperature (lower = more consistent)", 0.0, 0.6, 0.2, 0.05)
 
     st.divider()
     run_btn = st.button("Run review", type="primary", use_container_width=True)
 
-with col_right:
+with right:
     st.subheader("Run log")
-    st.info("When you click Run, you'll see live progress here (critic → figures → writer).")
+    st.info("Progress will appear here (critic → figures → writer).")
 
     if run_btn:
         if not uploaded_pdf:
             st.error("Please upload a PDF first.")
             st.stop()
 
-        # Save to private_inputs/
         pdf_path = save_upload_to_private(uploaded_pdf)
         OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -176,13 +191,8 @@ with col_right:
         critic_log = OUTPUTS_DIR / "critic_issue_log.md"
         figure_notes = OUTPUTS_DIR / "figure_notes.txt"
 
-        st.write(f"**Saved manuscript:** `{pdf_path}`")
-        st.write(f"**Output review:** `{out_md}`")
-
-        st.warning(
-            "Ensure Ollama is running locally and models are pulled. "
-            "If this is the first run, it may take a while."
-        )
+        st.write(f"Saved manuscript to: `{pdf_path}`")
+        st.write(f"Output review will be: `{out_md}`")
 
         rc = run_cli(
             pdf_path=pdf_path,
@@ -218,6 +228,7 @@ with col_right:
                     data=review_text,
                     file_name=out_md.name,
                     mime="text/markdown",
+                    use_container_width=True,
                 )
                 st.text_area("Preview", review_text, height=450)
             else:
@@ -230,6 +241,7 @@ with col_right:
                     data=critic_text,
                     file_name=critic_log.name,
                     mime="text/markdown",
+                    use_container_width=True,
                 )
                 st.text_area("Preview", critic_text, height=450)
             else:
@@ -242,18 +254,19 @@ with col_right:
                     data=fig_text,
                     file_name=figure_notes.name,
                     mime="text/plain",
+                    use_container_width=True,
                 )
                 st.text_area("Preview", fig_text, height=450)
             else:
                 st.info("No figure notes found yet.")
 
 st.divider()
-st.subheader("Previously uploaded manuscripts")
+st.subheader("Previously uploaded manuscripts (private_inputs/)")
 PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
 pdfs = sorted(PRIVATE_DIR.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
-
 if not pdfs:
-    st.caption("No PDFs found in private_inputs/ yet.")
+    st.caption("No PDFs found yet.")
 else:
-    for p in pdfs[:20]:
+    for p in pdfs[:30]:
         st.caption(f"- {p.name}")
+
