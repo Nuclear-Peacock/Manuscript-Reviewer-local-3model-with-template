@@ -10,7 +10,7 @@ from pathlib import Path
 
 # --- Configuration ---
 REQUIRED_MODELS = [
-    # Vision (FIXED: removed the dash)
+    # Vision
     "qwen2.5vl:7b",
     
     # Medium Set (The Default)
@@ -92,10 +92,15 @@ def main():
     # 3. Check Models (Auto-Setup)
     check_and_pull_models()
 
-    # 4. Run App
+    # 4. Run App (Auto-Launch Browser)
     log("🚀 Starting User Interface...")
     app_path = REPO_ROOT / "app.py"
-    cmd = [sys.executable, "-m", "streamlit", "run", str(app_path)]
+    
+    # We add "--server.headless", "false" to FORCE the browser to open
+    cmd = [
+        sys.executable, "-m", "streamlit", "run", str(app_path),
+        "--server.headless", "false"
+    ]
     
     try:
         subprocess.run(cmd, check=True)
