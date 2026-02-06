@@ -18,7 +18,7 @@ if %errorlevel% neq 0 (
     echo  NOTE: Windows cannot see the new Python installation
     echo        until you restart this launcher.
     echo.
-    echo  >>> PLEASE RESTART THIS FILE AFTER INSTALLATION. <<<
+    echo  *** PLEASE RESTART THIS FILE AFTER INSTALLATION ***
     echo.
     timeout /t 5 >nul
     start https://www.python.org/downloads/
