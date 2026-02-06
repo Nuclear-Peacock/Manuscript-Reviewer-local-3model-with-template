@@ -1,3 +1,4 @@
+![Security Scan Status](https://github.com/Nuclear-Peacock/Manuscript-Reviewer-local-3model-with-template/actions/workflows/security.yml/badge.svg)
 # Local Manuscript Reviewer (Radiology / Nuclear Medicine / Medical Education)
 
 A **local-only** manuscript review assistant that generates structured, human-style peer reviews using AI.
