@@ -9,10 +9,19 @@ import webbrowser
 from pathlib import Path
 
 # --- Configuration ---
+# We ONLY auto-download the "Medium" set to save time/disk space.
 REQUIRED_MODELS = [
-    "deepseek-r1",
+    # Vision (Shared by all)
+    "qwen2.5-vl:7b",
+    
+    # Medium Set (The Default)
+    "deepseek-r1:32b",
     "llama3.3",
-    "qwen2.5-vl"
+    
+    # OPTIONAL: Uncomment these if you want to force-download them too.
+    # "deepseek-r1:14b", # Fast Critic
+    # "llama3.1:8b",     # Fast Writer
+    # "deepseek-r1:70b"  # Accurate Critic
 ]
 
 REPO_ROOT = Path(__file__).resolve().parent
