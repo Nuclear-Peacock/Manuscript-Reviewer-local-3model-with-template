@@ -40,7 +40,7 @@ jobs:
 
       # 3. UPLOAD RESULTS TO GITHUB
       - name: Upload Scan Results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always() # Ensure results upload even if flaws are found
         with:
           sarif_file: 'trivy-results.sarif'
