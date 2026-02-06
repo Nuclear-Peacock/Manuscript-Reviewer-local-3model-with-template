@@ -4,9 +4,11 @@ import sys
 import time
 import hashlib
 import subprocess
+import urllib.request
+import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Set
 
 import streamlit as st
 
@@ -41,24 +43,24 @@ STUDY_DESIGNS = [
 ]
 
 PRESETS = {
-    "High quality, Low speed": {
-        "critic_model": "deepseek-r1",
+    "Accurate (Slow)": {
+        "critic_model": "deepseek-r1:70b",
         "writer_model": "llama3.3",
-        "vision_model": "qwen2.5-vl",
+        "vision_model": "qwen2.5-vl:7b",
         "image_clarity": 260,
         "deliberate_random": 0.25,
     },
-    "Medium quality, Medium speed": {
-        "critic_model": "deepseek-r1",
+    "Medium (Balanced)": {
+        "critic_model": "deepseek-r1:32b",
         "writer_model": "llama3.3",
-        "vision_model": "qwen2.5-vl",
+        "vision_model": "qwen2.5-vl:7b",
         "image_clarity": 220,
         "deliberate_random": 0.45,
     },
-    "Low quality, High speed": {
-        "critic_model": "deepseek-r1",
-        "writer_model": "llama3.3",
-        "vision_model": "qwen2.5-vl",
+    "Fast (Less Accurate)": {
+        "critic_model": "deepseek-r1:14b",
+        "writer_model": "llama3.1:8b",
+        "vision_model": "qwen2.5-vl:7b",
         "image_clarity": 180,
         "deliberate_random": 0.65,
     },
@@ -81,6 +83,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 hr { border: none; border-top: 1px solid rgba(255,255,255,0.10); margin: 1.1rem 0; }
 .small { color: rgba(255,255,255,0.75); font-size: 0.92rem; }
+.stAlert { margin-top: 1rem; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -116,18 +119,47 @@ def list_output_files(folder: Path) -> List[Path]:
     if not folder.exists():
         return []
     files = [p for p in folder.rglob("*") if p.is_file()]
-
     priority_substrings = [
         "_review.md", "review.md", "peer", "critic", "checklist",
         "figure", "table", ".md", ".json", ".txt",
     ]
-
     def score(p: Path):
         name = p.name.lower()
         pri = next((i for i, s in enumerate(priority_substrings) if s in name), len(priority_substrings))
         return (pri, name)
-
     return sorted(files, key=score)
+
+def get_installed_models() -> Set[str]:
+    """Queries local Ollama instance for installed model tags."""
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=1) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode())
+                # Normalize tags (e.g., 'llama3:latest' -> 'llama3') could be complex, 
+                # but we usually just match substring or full string. 
+                # For safety, we return the full 'name' field (e.g., 'llama3:latest').
+                return {m["name"] for m in data.get("models", [])}
+    except Exception:
+        pass
+    return set()
+
+def check_models_availability(preset_data: dict, installed_tags: Set[str]) -> Tuple[bool, List[str]]:
+    """Returns (True/False, list_of_missing_models)."""
+    required = [
+        preset_data["critic_model"],
+        preset_data["writer_model"],
+        preset_data["vision_model"]
+    ]
+    missing = []
+    for req in required:
+        # We check if the required model string is contained in any installed tag
+        # e.g. req="llama3" matches installed="llama3:latest" or "llama3:8b"
+        # BUT for strictness with versions like "llama3.1:8b", we should look for fairly specific matches.
+        # Here we check if the required string is a substring of any installed tag.
+        if not any(req in tag for tag in installed_tags):
+            missing.append(req)
+    
+    return (len(missing) == 0), missing
 
 def build_cli_command(
     pdf_path: Path,
@@ -140,13 +172,6 @@ def build_cli_command(
     image_clarity: int,
     deliberate_random: float,
 ) -> List[str]:
-    """
-    Constructs the CLI command with the CORRECT flags based on your error log.
-    --pdf -> --input
-    --output_dir -> --out
-    --vision_model -> --vlm_model
-    --dpi -> --fig_dpi
-    """
     category_map = {
         "Original Research": "original_research",
         "Review Article": "review_article",
@@ -179,6 +204,9 @@ def main():
     st.title(f"🧾 {APP_TITLE}")
     st.caption(APP_SUBTITLE)
 
+    # Fetch models ONCE per reload
+    installed_tags = get_installed_models()
+    
     # Sidebar settings
     with st.sidebar:
         st.markdown("### Privacy / confidentiality")
@@ -197,9 +225,32 @@ def main():
         )
 
         st.markdown("---")
-        st.markdown("### Choose the Critic/Writer Model Quality and Performance")
-        preset_name = st.selectbox("Model preset", list(PRESETS.keys()), index=1)
-        preset = PRESETS[preset_name]
+        st.markdown("### Choose the Critic/Writer Model Quality")
+        
+        # Smart Preset Dropdown
+        # We modify the keys to show status (e.g., "Accurate [MISSING MODELS]")
+        preset_options = list(PRESETS.keys())
+        
+        # We need a map to get back to the real key if we change the display text
+        # Actually, simpler: just select the key, but use 'format_func' to display status
+        
+        def format_preset(name):
+            is_ready, _ = check_models_availability(PRESETS[name], installed_tags)
+            if is_ready:
+                return name
+            return f"{name} (Download Required ⬇️)"
+
+        selected_key = st.selectbox(
+            "Model preset", 
+            preset_options, 
+            index=1, # Default to Medium
+            format_func=format_preset
+        )
+        
+        preset = PRESETS[selected_key]
+        
+        # Check availability for the SELECTED preset
+        is_preset_ready, missing_models = check_models_availability(preset, installed_tags)
 
         st.markdown("### Advanced settings")
         image_clarity = st.slider(
@@ -213,10 +264,10 @@ def main():
             help="Lower feels more deliberate/consistent. Higher feels more random/creative.",
         )
 
-        with st.expander("Model details (optional)"):
-            critic_model = st.text_input("Critic model", value=preset["critic_model"])
-            writer_model = st.text_input("Writer model", value=preset["writer_model"])
-            vision_model = st.text_input("Vision model", value=preset["vision_model"])
+        with st.expander("Model details"):
+            st.text_input("Critic model", value=preset["critic_model"], disabled=True)
+            st.text_input("Writer model", value=preset["writer_model"], disabled=True)
+            st.text_input("Vision model", value=preset["vision_model"], disabled=True)
 
         st.markdown("---")
         local_only_confirm = st.checkbox(
@@ -243,22 +294,29 @@ def main():
     with colC:
         st.markdown("### 3) Start review")
         st.caption("Runs locally using your local models (Ollama + GPU where configured).")
-        # Define run_btn here so it is available in the scope below
+        
+        # Disable logic
+        btn_disabled = (uploaded is None or not local_only_confirm or not is_preset_ready)
+        
         run_btn = st.button(
             "Start review",
             type="primary",
             use_container_width=True,
-            disabled=(uploaded is None or not local_only_confirm),
+            disabled=btn_disabled,
         )
-        if uploaded is None:
-            st.caption("Upload a PDF to enable Start review.")
+        
+        if not is_preset_ready:
+            st.error(f"❌ Missing models for this preset: {', '.join(missing_models)}")
+            st.caption(f"Run this in terminal to fix: `ollama pull {missing_models[0]}`")
+        elif uploaded is None:
+            st.caption("Upload a PDF to enable Start.")
         elif not local_only_confirm:
-            st.caption("Confirm local-only use in the sidebar to enable Start review.")
+            st.caption("Confirm local-only use in sidebar.")
 
     st.markdown("---")
 
     # Run pipeline
-    if run_btn:
+    if run_btn and is_preset_ready:
         # Save upload
         original_name = _safe_filename(uploaded.name)
         tmp = PRIVATE_INPUTS / f"{_now_stamp()}__{original_name}"
@@ -279,16 +337,15 @@ def main():
             output_dir=output_dir,
             manuscript_category=manuscript_category,
             study_design=study_design,
-            critic_model=critic_model,
-            writer_model=writer_model,
-            vision_model=vision_model,
+            critic_model=preset["critic_model"],
+            writer_model=preset["writer_model"],
+            vision_model=preset["vision_model"],
             image_clarity=image_clarity,
             deliberate_random=deliberate_random,
         )
 
         st.markdown("### Review Progress")
         
-        # UI Elements for Progress
         prog_bar = st.progress(0, text="Initializing reviewer...")
         with st.expander("See raw technical logs (for debugging)", expanded=False):
             log_box = st.empty()
@@ -326,7 +383,6 @@ def main():
                     elif "saving" in lower_line or "completed" in lower_line:
                         prog_bar.progress(95, text="💾 Finalizing and saving reports...")
 
-                    # Update hidden log (keep last 50 lines to save memory/rendering)
                     log_box.code("\n".join(collected[-50:]), language="text")
 
                 if p.poll() is not None:
@@ -345,11 +401,9 @@ def main():
         elapsed = time.time() - start
         prog_bar.progress(100, text=f"✅ Complete! (took {elapsed:.1f}s)")
         
-        # Save log
         run_log = output_dir / "run_log.txt"
         run_log.write_text("\n".join(collected), encoding="utf-8")
 
-        # DISPLAY OUTPUTS
         st.markdown("### Generated Reviews & Reports")
         files = list_output_files(output_dir)
         if not files:
