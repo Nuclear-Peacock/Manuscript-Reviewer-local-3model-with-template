@@ -140,6 +140,13 @@ def build_cli_command(
     image_clarity: int,
     deliberate_random: float,
 ) -> List[str]:
+    """
+    CORRECTED to match your CLI's specific flags:
+    --pdf -> --input
+    --output_dir -> --out
+    --vision_model -> --vlm_model
+    --dpi -> --fig_dpi
+    """
     category_map = {
         "Original Research": "original_research",
         "Review Article": "review_article",
@@ -149,16 +156,17 @@ def build_cli_command(
 
     cmd = [
         sys.executable, "-m", "reviewer.cli",
-        "--pdf", str(pdf_path),
-        "--output_dir", str(output_dir),
+        "--input", str(pdf_path),             # Fixed
+        "--out", str(output_dir),             # Fixed
         "--manuscript_type", cat_value,
         "--critic_model", critic_model,
         "--writer_model", writer_model,
-        "--vision_model", vision_model,
-        "--dpi", str(int(image_clarity)),
+        "--vlm_model", vision_model,          # Fixed
+        "--fig_dpi", str(int(image_clarity)), # Fixed
         "--temperature", str(float(deliberate_random)),
     ]
 
+    # Optional study design (only for original research)
     if manuscript_category == "Original Research" and study_design and study_design != "Not specified":
         cmd += ["--study_design", study_design]
 
