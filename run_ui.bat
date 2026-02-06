@@ -73,7 +73,7 @@ call :CHECK_MODEL "qwen2.5vl:7b"
 
 if "%MISSING%"=="1" (
   echo.
-  choice /c YN /m "Some models are missing. Install missing models now? (recommended)"
+  choice /c YN /m "Some models are missing. Install missing models now? (recommended: choose option 1 in the next menu)"
   if errorlevel 2 goto START_UI
   if exist "setup_models.bat" (
     call "setup_models.bat"
