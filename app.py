@@ -46,25 +46,26 @@ PRESETS = {
     "Accurate (Slow)": {
         "critic_model": "deepseek-r1:70b",
         "writer_model": "llama3.3",
-        "vision_model": "qwen2.5vl:7b",   # FIXED: Removed dash
+        "vision_model": "qwen2.5vl:7b",
         "image_clarity": 260,
         "deliberate_random": 0.25,
     },
     "Medium (Balanced)": {
         "critic_model": "deepseek-r1:32b",
         "writer_model": "llama3.3",
-        "vision_model": "qwen2.5vl:7b",   # FIXED: Removed dash
+        "vision_model": "qwen2.5vl:7b",
         "image_clarity": 220,
         "deliberate_random": 0.45,
     },
     "Fast (Less Accurate)": {
         "critic_model": "deepseek-r1:14b",
         "writer_model": "llama3.1:8b",
-        "vision_model": "qwen2.5vl:7b",   # FIXED: Removed dash
+        "vision_model": "qwen2.5vl:7b",
         "image_clarity": 180,
         "deliberate_random": 0.65,
     },
 }
+
 # ----------------------------
 # Streamlit config + minimal CSS
 # ----------------------------
@@ -134,9 +135,6 @@ def get_installed_models() -> Set[str]:
         with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=1) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode())
-                # Normalize tags (e.g., 'llama3:latest' -> 'llama3') could be complex, 
-                # but we usually just match substring or full string. 
-                # For safety, we return the full 'name' field (e.g., 'llama3:latest').
                 return {m["name"] for m in data.get("models", [])}
     except Exception:
         pass
@@ -151,14 +149,27 @@ def check_models_availability(preset_data: dict, installed_tags: Set[str]) -> Tu
     ]
     missing = []
     for req in required:
-        # We check if the required model string is contained in any installed tag
-        # e.g. req="llama3" matches installed="llama3:latest" or "llama3:8b"
-        # BUT for strictness with versions like "llama3.1:8b", we should look for fairly specific matches.
-        # Here we check if the required string is a substring of any installed tag.
         if not any(req in tag for tag in installed_tags):
             missing.append(req)
-    
     return (len(missing) == 0), missing
+
+def pull_model_with_progress(model_name: str):
+    """ Runs 'ollama pull' and shows a spinner. """
+    try:
+        # We use a subprocess call. Ollama prints progress to stderr usually.
+        # Capturing real-time percentage in Streamlit is tricky without a complex socket.
+        # We will use a simple spinner for now.
+        with st.spinner(f"Downloading {model_name}... (This can take a while for large models)"):
+            # 'check=True' will raise an error if the pull fails
+            subprocess.run(["ollama", "pull", model_name], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        st.success(f"Successfully downloaded {model_name}!")
+        time.sleep(1) # Let user see the success message
+        st.rerun()    # Refresh app to recognize the new model
+    except subprocess.CalledProcessError:
+        st.error(f"Failed to download {model_name}. Check internet connection or model name.")
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+
 
 def build_cli_command(
     pdf_path: Path,
@@ -226,12 +237,7 @@ def main():
         st.markdown("---")
         st.markdown("### Choose the Critic/Writer Model Quality")
         
-        # Smart Preset Dropdown
-        # We modify the keys to show status (e.g., "Accurate [MISSING MODELS]")
         preset_options = list(PRESETS.keys())
-        
-        # We need a map to get back to the real key if we change the display text
-        # Actually, simpler: just select the key, but use 'format_func' to display status
         
         def format_preset(name):
             is_ready, _ = check_models_availability(PRESETS[name], installed_tags)
@@ -247,9 +253,15 @@ def main():
         )
         
         preset = PRESETS[selected_key]
-        
-        # Check availability for the SELECTED preset
         is_preset_ready, missing_models = check_models_availability(preset, installed_tags)
+
+        # ---- DOWNLOAD LOGIC ----
+        if not is_preset_ready:
+            st.warning(f"Missing: {', '.join(missing_models)}")
+            if st.button("📥 Download Missing Models", type="primary"):
+                for m in missing_models:
+                    pull_model_with_progress(m)
+        # ------------------------
 
         st.markdown("### Advanced settings")
         image_clarity = st.slider(
@@ -294,7 +306,6 @@ def main():
         st.markdown("### 3) Start review")
         st.caption("Runs locally using your local models (Ollama + GPU where configured).")
         
-        # Disable logic
         btn_disabled = (uploaded is None or not local_only_confirm or not is_preset_ready)
         
         run_btn = st.button(
@@ -305,8 +316,7 @@ def main():
         )
         
         if not is_preset_ready:
-            st.error(f"❌ Missing models for this preset: {', '.join(missing_models)}")
-            st.caption(f"Run this in terminal to fix: `ollama pull {missing_models[0]}`")
+            st.caption("⚠️ Install models in sidebar to start.")
         elif uploaded is None:
             st.caption("Upload a PDF to enable Start.")
         elif not local_only_confirm:
